@@ -1,41 +1,102 @@
-# Antigravity Mobile Companion (PWA + Multi-Agent Backend)
+# OwnStack — Antigravity Multi-Agent Mobile & Desktop IDE
 
-A mobile-first Progressive Web Application (PWA) and FastAPI backend that lets you manage your codebase, orchestrate **multiple AI agents** (both **Ollama local models** via `LocalOpenAIAgentConfig` and **Gemini models** via `LocalAgentConfig`), review diffs, approve/reject tool calls, and run Git operations from your phone.
+<p align="center">
+  <img src="frontend/ownstack-banner.jpeg" alt="OwnStack Antigravity IDE Banner" width="420" />
+</p>
 
-## Features
+An open-source, mobile-first and desktop-ready AI Development Environment powered by the **Google Antigravity Python SDK (`google-antigravity`)**, **Ollama (`LocalOpenAIAgentConfig`)**, and **Gemini (`LocalAgentConfig`)**.
 
-1. **Multi-Agent & Ollama Support (`google-antigravity` SDK)**
-   - **Ollama / Local OpenAI Server (`LocalOpenAIAgentConfig`)**: Connect to your local or remote Ollama instance (e.g. `http://localhost:11434/v1` with `gemma4:26b`, `qwen2.5-coder`, `llama3.3`, or your own fine-tuned models once your new PC arrives!). Uses `.lightweight()` preset for optimized local context & coding tools.
-   - **Gemini API (`LocalAgentConfig`)**: Use Google AI Studio API keys (`GEMINI_API_KEY`) with full subagent orchestration (`researcher`, `coder`, `reviewer`, `test_runner`).
-   - **LiteRT On-Device (`LiteRTAgentConfig`)**: Ready for `.litertlm` local checkpoints on GPU/NPU.
-   - **Multi-Agent Profiles**: Create, switch, and run specialized agents (e.g., *Architect*, *Code Writer*, *Bug Hunter*, *Test Engineer*) or let the root agent delegate to subagents (`SubagentConfig`).
+Work on your codebase from your phone (over Wi-Fi, 4G/5G via Tailscale, or 24/7 Cloud Hosting on Render) or from your desktop browser with autonomous coding agents, mobile tool approval gates, a 1-click GitHub repository switcher, a split-screen file & diff editor, and full Git source control.
 
-2. **Real-Time Agent Chat & Streaming Execution View**
-   - WebSocket streaming for model reasoning (`response.thoughts`), token-by-token responses, and live tool call telemetry (`pre_tool_call_decide`, `post_tool_call`).
+---
 
-3. **Mobile Approval Gates**
-   - Intercepts sensitive tool calls (`run_command`, `edit_file`, `create_file`) via `policy.ask_user(...)` and `pre_tool_call_decide` hooks.
-   - Pushes an interactive **Approve / Reject** modal (`<dialog>`) and card directly to your phone screen before execution proceeds.
+## Key Features
 
-4. **File Tree Explorer & Diff Viewer**
-   - Browse workspace files, view syntax-highlighted source code, inspect side-by-side / unified file changes, and edit files on the go.
+1. **Dual-Engine Multi-Agent Runtime (`Ollama` ↔ `Gemini`)**
+   - **1-Tap Engine Switcher**: Toggle instantly between **Ollama** (`LocalOpenAIAgentConfig(...).lightweight()`) and **Gemini** (`LocalAgentConfig(...)` with hierarchical `code_researcher`, `fact_checker`, and `test_specialist` subagents) from the top navigation bar.
+   - **Custom Agent Profiles**: Create unlimited specialized agent personas with custom models (`gemma4:26b`, `qwen2.5-coder`, or your own fine-tuned checkpoints), custom instructions, and per-tool approval gates.
+   - **LiteRT On-Device Ready**: Supports `LiteRTAgentConfig` for zero-latency local `.litertlm` checkpoints on GPU/NPU.
 
-5. **Git Status, Diff, Commit & Branch Controls**
-   - View modified/staged/untracked files, inspect `git diff`, stage/unstage changes, switch or create branches, and commit directly from mobile.
+2. **Mobile & Desktop Tool Approval Gates**
+   - Intercepts sensitive agent actions (`run_command`, `edit_file`, `create_file`) via the Antigravity SDK's `policy.ask_user(...)` and `@hooks.pre_tool_call_decide`.
+   - Pauses agent execution and opens a native `<dialog>` permission prompt on your phone or PC so you can **Approve & Run** or **Deny** every command or file modification.
 
-## Quick Start
+3. **1-Click GitHub Repository Browser & Workspace Switcher**
+   - Browse your GitHub repositories (`@RealRiga` or any GitHub username + optional Personal Access Token for private repos) in the **GitHub Repos (`<>`)** tab.
+   - Click **"Open in IDE →"** on any repository to automatically clone it and switch the entire IDE workspace into that project.
+
+4. **Responsive Explorer, Code Editor & Unified Diff Viewer**
+   - Side-by-side split-screen file tree and code/diff editor on PC, and a touch-optimized stacked view on mobile.
+   - Inspect unified diffs (`+` / `-` syntax highlighting) and save edits directly to disk.
+
+5. **Full Git Source Control**
+   - Check working tree status, stage files (`git add -A`), commit changes, switch or create branches, and inspect commit history.
+
+6. **Professional Light (White Default) & Dark Theme**
+   - Opens in a clean white editorial theme by default with a 1-tap Sun/Moon dark mode toggle in the top header.
+
+---
+
+## Quick Start (Option 1: Run on Your Local PC)
 
 ```bash
 cd /home/realriga/development/me/antigravity-mobile-ide
 
-# 1. Create and populate Python virtual environment
+# 1. Create virtual environment & install dependencies (first time only)
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 
-# 2. Start the server (binds to 0.0.0.0:8000 so you can access it over Wi-Fi / Tailscale)
-.venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+# 2. Copy and configure your .env file
+cp .env.example .env
+
+# 3. Launch the local server (prints both your Local Wi-Fi URL and Tailscale 4G/5G URL)
+./deploy/start-local-mobile.sh
 ```
 
-Then open **`http://localhost:8000`** (or your PC's LAN/Tailscale IP `http://<your-pc-ip>:8000`) on your phone!
+### Auto-Start on PC Boot (Systemd Service)
+```bash
+mkdir -p ~/.config/systemd/user
+cp /home/realriga/development/me/antigravity-mobile-ide/deploy/antigravity-mobile.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now antigravity-mobile.service
+```
 
-# antigravity-mobile-ide
+---
+
+## Cloud Deployment (Option 2: 24/7 Access When Your PC is Off)
+
+### 1. Deploy Free on Render.com (`render.yaml`)
+1. Open **[https://dashboard.render.com/blueprint/new?repo=https://github.com/RealRiga/antigravity-mobile-ide](https://dashboard.render.com/blueprint/new?repo=https://github.com/RealRiga/antigravity-mobile-ide)**
+2. Set your environment variables:
+   - `GEMINI_API_KEY`: Your key from [Google AI Studio](https://aistudio.google.com/app/api-keys) (`AIzaSy...`) or Vertex Express Mode (`AQ....`).
+   - `AGY_ACCESS_PIN`: A secret PIN you choose (e.g., `482910`) to lock your cloud IDE.
+3. Click **Apply**. Your permanent cloud URL (`https://antigravity-mobile-ide.onrender.com`) will build automatically from the [`Dockerfile`](Dockerfile).
+
+### 2. Keep Render Awake 24/7 with Cron-Job.org
+Render's free tier sleeps after 15 minutes of inactivity. To keep it awake 24/7:
+- Create a free monitor on **[https://cron-job.org](https://cron-job.org)** or **[https://uptimerobot.com](https://uptimerobot.com)**
+- Set the URL to:
+  ```text
+  https://antigravity-mobile-ide.onrender.com/health
+  ```
+- Set the interval to **Every 10 minutes**.
+
+---
+
+## Troubleshooting Common API Key & Setup Questions
+
+### Why did I see `403 SERVICE_DISABLED: Agent Platform API (aiplatform.googleapis.com) has not been used in project...`?
+- **Cause:** API keys starting with `AQ....` use **Google Cloud Vertex AI / Agent Platform Express Mode** (`aiplatform.googleapis.com`). If your Google Cloud project is brand new, Google requires you to click **"Enable"** on the Vertex AI API once in the Google Cloud Console.
+- **How to Fix:**
+  1. **1-Click Enable:** Open the activation link shown in the error message (for project `308402531123`: `https://console.developers.google.com/apis/api/aiplatform.googleapis.com/overview?project=308402531123`) and click **Enable**, then wait 60 seconds.
+  2. **Or Use a Standard AI Studio Key (`AIzaSy...`):** Go to [https://aistudio.google.com/app/api-keys](https://aistudio.google.com/app/api-keys), create a standard Gemini API key (`AIzaSy...`), and paste it into the **Agents & Config** tab (or Render's `GEMINI_API_KEY` variable).
+
+---
+
+## Documentation & Architecture
+
+For a deep dive into how the backend, frontend, WebSocket protocol, approval gates, and multi-agent orchestration work, read **[DOCS.md](DOCS.md)**.
+
+## License
+
+Released under the **[MIT License](LICENSE)**.

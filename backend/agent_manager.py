@@ -312,6 +312,7 @@ class MultiAgentOrchestrator:
         self,
         profile: AgentProfile,
         emit: EventCallback,
+        force_vertex: Optional[bool] = None,
     ) -> Any:
         """Builds the official `google-antigravity` AgentConfig for Ollama, Gemini, or LiteRT."""
         if not HAS_AGY_SDK:
@@ -431,8 +432,10 @@ class MultiAgentOrchestrator:
         active_key = (self.gemini_api_key or os.environ.get("GEMINI_API_KEY", "")).strip()
         if active_key:
             kwargs["api_key"] = active_key
-            # Support Gemini Enterprise Agent Platform / Vertex Express Mode keys (prefixed with AQ.)
-            if active_key.startswith("AQ."):
+            if force_vertex is not None:
+                if force_vertex:
+                    kwargs["vertex"] = True
+            elif active_key.startswith("AQ."):
                 kwargs["vertex"] = True
 
         return LocalAgentConfig(**kwargs)
@@ -508,36 +511,59 @@ class MultiAgentOrchestrator:
 
         # Full Google Antigravity SDK Execution
         try:
+            active_key = (self.gemini_api_key or os.environ.get("GEMINI_API_KEY", "")).strip()
             config = self._build_sdk_config(profile, emit)
             full_text: List[str] = []
-            async with Agent(config=config) as agent:
-                response = await agent.chat(prompt)
+            try:
+                async with Agent(config=config) as agent:
+                    response = await agent.chat(prompt)
 
-                # Stream model thoughts if exposed
-                if hasattr(response, "thoughts") and response.thoughts is not None:
+                    if hasattr(response, "thoughts") and response.thoughts is not None:
+                        try:
+                            async for thought in response.thoughts:
+                                await emit(
+                                    {
+                                        "type": "thought_delta",
+                                        "agent_id": profile.id,
+                                        "delta": str(thought),
+                                    }
+                                )
+                        except Exception:
+                            pass
+
+                    async for token in response:
+                        chunk = str(token)
+                        full_text.append(chunk)
+                        await emit(
+                            {
+                                "type": "token_delta",
+                                "agent_id": profile.id,
+                                "delta": chunk,
+                            }
+                        )
+            except Exception as first_exc:
+                err_str = str(first_exc)
+                # If an AQ. key failed because Vertex/Agent Platform API is disabled on the GCP project,
+                # retry once without vertex=True before surfacing an actionable activation link.
+                if profile.provider == "gemini" and active_key.startswith("AQ.") and "SERVICE_DISABLED" in err_str:
                     try:
-                        async for thought in response.thoughts:
-                            await emit(
-                                {
-                                    "type": "thought_delta",
-                                    "agent_id": profile.id,
-                                    "delta": str(thought),
-                                }
-                            )
+                        fallback_cfg = self._build_sdk_config(profile, emit, force_vertex=False)
+                        async with Agent(config=fallback_cfg) as agent:
+                            response = await agent.chat(prompt)
+                            async for token in response:
+                                chunk = str(token)
+                                full_text.append(chunk)
+                                await emit(
+                                    {
+                                        "type": "token_delta",
+                                        "agent_id": profile.id,
+                                        "delta": chunk,
+                                    }
+                                )
                     except Exception:
-                        pass
-
-                # Stream response tokens
-                async for token in response:
-                    chunk = str(token)
-                    full_text.append(chunk)
-                    await emit(
-                        {
-                            "type": "token_delta",
-                            "agent_id": profile.id,
-                            "delta": chunk,
-                        }
-                    )
+                        raise first_exc
+                else:
+                    raise first_exc
 
             final_answer = "".join(full_text)
             self.conversation_history[agent_id].append(
@@ -546,11 +572,29 @@ class MultiAgentOrchestrator:
             await emit({"type": "turn_end", "agent_id": profile.id, "content": final_answer})
 
         except Exception as exc:
+            err_msg = str(exc)
+            if "SERVICE_DISABLED" in err_msg or "aiplatform.googleapis.com" in err_msg:
+                # Extract activation URL if present
+                import re
+                match = re.search(r"https://console\.developers\.google\.com/apis/api/aiplatform\.googleapis\.com/overview\?project=\d+", err_msg)
+                act_url = match.group(0) if match else "https://console.cloud.google.com/apis/library/aiplatform.googleapis.com"
+                await self._run_interactive_sandbox_fallback(
+                    profile,
+                    prompt,
+                    emit,
+                    notice=(
+                        f"Your Google Cloud project requires enabling the **Vertex AI / Agent Platform API** once for your `AQ.` key. "
+                        f"Click here to enable it in 1 click: **{act_url}** (then wait ~60 seconds), OR use a standard `AIzaSy...` key from https://aistudio.google.com/app/api-keys. "
+                        f"*(Showing live interactive workspace preview below while it activates)*"
+                    ),
+                )
+                return
+
             await emit(
                 {
                     "type": "error",
                     "agent_id": profile.id,
-                    "message": f"SDK Execution Error: {exc}",
+                    "message": f"SDK Execution Error: {err_msg}",
                 }
             )
 
