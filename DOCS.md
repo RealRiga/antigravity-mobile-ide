@@ -106,3 +106,4 @@ When deployed to the cloud (e.g., Render.com):
 | `deploy/antigravity-mobile.service` | `systemd` user service unit for auto-starting the IDE on Linux boot. |
 | `Dockerfile` & `render.yaml` | Production container image and Render Free Tier blueprint configuration. |
 | `LICENSE` | Open-source MIT License. |
+

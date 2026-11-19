@@ -269,6 +269,22 @@ async def list_files() -> Dict[str, Any]:
     }
 
 
+@app.get("/api/docs")
+async def get_project_docs() -> Dict[str, str]:
+    """Returns both DOCS.md and README.md so users can read complete project documentation inside the app."""
+    docs_path = os.path.join(PROJECT_ROOT, "DOCS.md")
+    readme_path = os.path.join(PROJECT_ROOT, "README.md")
+    docs_text = ""
+    readme_text = ""
+    if os.path.isfile(docs_path):
+        with open(docs_path, "r", encoding="utf-8") as f:
+            docs_text = f.read()
+    if os.path.isfile(readme_path):
+        with open(readme_path, "r", encoding="utf-8") as f:
+            readme_text = f.read()
+    return {"docs": docs_text, "readme": readme_text}
+
+
 @app.get("/api/files/read")
 async def read_workspace_file(path: str) -> Dict[str, Any]:
     try:

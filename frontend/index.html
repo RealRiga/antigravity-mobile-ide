@@ -110,14 +110,21 @@
           class="w-full pro-input text-xs font-mono rounded-xl px-3.5 py-2.5" />
       </div>
 
-      <!-- Primary Get Started CTA -->
-      <div class="pt-1">
+      <!-- Primary Get Started CTA + Read Documentation Button -->
+      <div class="pt-1 flex flex-col sm:flex-row gap-2.5">
         <button id="btn-get-started" type="button"
-          class="w-full btn-primary-pro rounded-2xl py-3.5 px-6 text-sm font-semibold flex items-center justify-center gap-2 shadow-sm">
+          class="flex-1 btn-primary-pro rounded-2xl py-3.5 px-6 text-sm font-semibold flex items-center justify-center gap-2 shadow-sm">
           <span>Get Started</span>
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
           </svg>
+        </button>
+        <button id="btn-welcome-docs" type="button"
+          class="pro-pill rounded-2xl py-3.5 px-5 text-sm font-semibold flex items-center justify-center gap-2 hover:opacity-85 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+          <span>Read Docs</span>
         </button>
       </div>
     </div>
@@ -252,6 +259,14 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
           </svg>
           <span class="hidden sm:inline truncate">Agents &amp; Config</span>
+        </button>
+
+        <button type="button" data-tab="docs"
+          class="nav-tab-btn w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-secondary hover:text-primary text-xs transition">
+          <svg class="w-4 h-4 shrink-0 mx-auto sm:mx-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+          <span class="hidden sm:inline truncate">Docs &amp; Guide</span>
         </button>
       </div>
 
@@ -529,6 +544,43 @@
             <span class="text-[11px] text-tertiary">Tap to switch active agent</span>
           </div>
           <div id="agents-roster-list" class="space-y-2.5"></div>
+        </div>
+      </section>
+
+      <!-- VIEW 6: IN-APP DOCUMENTATION & ARCHITECTURE GUIDE -->
+      <section id="view-docs" class="hidden flex-1 overflow-y-auto p-4 sm:p-6 select-text">
+        <div class="max-w-3xl mx-auto space-y-4">
+          <div class="pro-card rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 class="text-base font-bold text-primary">OwnStack Antigravity IDE — Documentation</h2>
+              <p class="text-xs text-secondary">Architecture, Multi-Agent SDK configs, API key setup, and cloud deployment guide</p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button type="button" id="btn-doc-tab-guide" class="btn-primary-pro text-xs px-3.5 py-1.5 rounded-full">
+                Architecture (DOCS.md)
+              </button>
+              <button type="button" id="btn-doc-tab-readme" class="pro-pill text-xs font-semibold px-3.5 py-1.5 rounded-full">
+                Quick Start (README.md)
+              </button>
+            </div>
+          </div>
+
+          <!-- Instant API Key Fix Banner Inside Docs -->
+          <div class="pro-card rounded-2xl p-4 space-y-2 border-indigo-500/30">
+            <div class="text-xs font-bold text-primary">💡 Quick Tip: Enabling Your Google Cloud / Gemini API Key</div>
+            <p class="text-xs text-secondary leading-relaxed">
+              • If you have an <code>AQ....</code> Vertex Express API key and clicking the Google Console link took you to the general <strong>API Library</strong> page for project <code>dynamic-mobile-ide</code>, click this exact direct link to go straight to the <strong>Vertex AI API</strong> page and click <strong>Enable</strong>:<br/>
+              <a href="https://console.cloud.google.com/apis/library/aiplatform.googleapis.com?project=dynamic-mobile-ide" target="_blank" rel="noopener" class="underline font-semibold text-indigo-600">
+                https://console.cloud.google.com/apis/library/aiplatform.googleapis.com?project=dynamic-mobile-ide
+              </a><br/>
+              • Or, if you want a key that does <strong>not</strong> require enabling Google Cloud Vertex AI or starting the $300 GCP trial, open <a href="https://aistudio.google.com/app/api-keys" target="_blank" rel="noopener" class="underline font-semibold text-indigo-600">Google AI Studio (aistudio.google.com/app/api-keys)</a> and create a standard <code>AIzaSy...</code> key!
+            </p>
+          </div>
+
+          <!-- Rendered Markdown Documentation Content -->
+          <article id="docs-content-box" class="pro-card rounded-2xl p-5 text-xs sm:text-sm text-primary leading-relaxed space-y-3 font-sans overflow-x-auto">
+            Loading documentation...
+          </article>
         </div>
       </section>
 

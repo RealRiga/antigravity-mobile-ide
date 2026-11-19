@@ -270,7 +270,7 @@ function activateTab(targetTab) {
     }
   });
 
-  ["chat", "files", "github", "git", "agents"].forEach((tab) => {
+  ["chat", "files", "github", "git", "agents", "docs"].forEach((tab) => {
     const el = document.getElementById(`view-${tab}`);
     if (!el) return;
     if (tab === targetTab) {
@@ -287,6 +287,7 @@ function activateTab(targetTab) {
   }
   if (targetTab === "git") loadGitStatus();
   if (targetTab === "agents") renderAgentsRoster();
+  if (targetTab === "docs") loadInAppDocs("docs");
 }
 
 document.querySelectorAll(".nav-tab-btn").forEach((btn) => {
@@ -1106,5 +1107,89 @@ document.getElementById("btn-test-ollama").addEventListener("click", async () =>
   alert(info.message);
   await refreshHealth();
 });
+
+// 13. In-App Documentation Viewer (DOCS.md & README.md)
+let cachedDocsPayload = null;
+
+async function loadInAppDocs(which = "docs") {
+  const box = document.getElementById("docs-content-box");
+  if (!box) return;
+  const btnGuide = document.getElementById("btn-doc-tab-guide");
+  const btnReadme = document.getElementById("btn-doc-tab-readme");
+
+  if (btnGuide && btnReadme) {
+    if (which === "docs") {
+      btnGuide.className = "btn-primary-pro text-xs px-3.5 py-1.5 rounded-full";
+      btnReadme.className = "pro-pill text-xs font-semibold px-3.5 py-1.5 rounded-full";
+    } else {
+      btnReadme.className = "btn-primary-pro text-xs px-3.5 py-1.5 rounded-full";
+      btnGuide.className = "pro-pill text-xs font-semibold px-3.5 py-1.5 rounded-full";
+    }
+  }
+
+  if (!cachedDocsPayload) {
+    try {
+      const res = await fetch("/api/docs");
+      if (res.ok) {
+        cachedDocsPayload = await res.json();
+      }
+    } catch (e) {}
+  }
+
+  const rawMd =
+    (cachedDocsPayload && (which === "docs" ? cachedDocsPayload.docs : cachedDocsPayload.readme)) ||
+    "Documentation file loaded.";
+  box.innerHTML = renderDocMarkdown(rawMd);
+}
+
+function renderDocMarkdown(md) {
+  const lines = md.split("\n");
+  let html = "";
+  let inCode = false;
+  lines.forEach((line) => {
+    if (line.trim().startsWith("```")) {
+      if (!inCode) {
+        inCode = true;
+        html += `<pre class="bg-zinc-950 text-zinc-100 rounded-xl p-3.5 font-mono text-[11px] overflow-x-auto my-2">`;
+      } else {
+        inCode = false;
+        html += `</pre>`;
+      }
+      return;
+    }
+    if (inCode) {
+      html += escapeHtml(line) + "\n";
+      return;
+    }
+    if (line.startsWith("# ")) {
+      html += `<h1 class="text-lg font-bold text-primary pt-2 pb-1 border-b pro-border">${formatSimpleMarkdown(line.slice(2))}</h1>`;
+    } else if (line.startsWith("## ")) {
+      html += `<h2 class="text-sm font-bold text-primary pt-3">${formatSimpleMarkdown(line.slice(3))}</h2>`;
+    } else if (line.startsWith("### ")) {
+      html += `<h3 class="text-xs font-semibold text-primary pt-2">${formatSimpleMarkdown(line.slice(4))}</h3>`;
+    } else if (line.trim().startsWith("- ")) {
+      html += `<div class="pl-3 flex items-start gap-2 text-xs text-secondary"><span class="text-primary">•</span><span>${formatSimpleMarkdown(line.trim().slice(2))}</span></div>`;
+    } else if (line.trim() === "---") {
+      html += `<hr class="pro-border my-2" />`;
+    } else if (line.trim().length > 0 && !line.trim().startsWith("<")) {
+      html += `<p class="text-xs text-secondary leading-relaxed">${formatSimpleMarkdown(line)}</p>`;
+    }
+  });
+  return html;
+}
+
+const btnWelcomeDocs = document.getElementById("btn-welcome-docs");
+if (btnWelcomeDocs) {
+  btnWelcomeDocs.addEventListener("click", () => {
+    localStorage.setItem("agy_onboarded", "true");
+    welcomeScreen.classList.add("hidden");
+    activateTab("docs");
+  });
+}
+
+const btnDocGuide = document.getElementById("btn-doc-tab-guide");
+const btnDocReadme = document.getElementById("btn-doc-tab-readme");
+if (btnDocGuide) btnDocGuide.addEventListener("click", () => loadInAppDocs("docs"));
+if (btnDocReadme) btnDocReadme.addEventListener("click", () => loadInAppDocs("readme"));
 
 initApp();
