@@ -147,7 +147,7 @@ class MultiAgentOrchestrator:
                 name="Gemini Lead Architect (+Subagents)",
                 role="Multi-Agent Coordinator & Lead Engineer",
                 provider="gemini",
-                model="",  # Uses SDK default model per best practices
+                model="gemini-3.1-flash-lite",
                 system_instructions=(
                     "You are the Lead Software Architect. You can delegate file exploration to "
                     "your 'code_researcher' and 'test_specialist' subagents, propose clean diffs, "
@@ -313,6 +313,8 @@ class MultiAgentOrchestrator:
         profile: AgentProfile,
         emit: EventCallback,
         force_vertex: Optional[bool] = None,
+        model_override: Optional[str] = None,
+        fail_fast: bool = True,
     ) -> Any:
         """Builds the official `google-antigravity` AgentConfig for Ollama, Gemini, or LiteRT."""
         if not HAS_AGY_SDK:
@@ -426,14 +428,16 @@ class MultiAgentOrchestrator:
             "policies": agent_policies,
             "hooks": [on_pre_tool, on_post_tool],
         }
-        # Only set model explicitly if requested by user profile
-        if profile.model.strip():
-            kwargs["model"] = profile.model.strip()
+        if fail_fast:
+            kwargs["retry_config"] = types.RetryConfig(
+                api_retry=types.ModelAPIRetryConfig(max_retries=0)
+            )
+        chosen_model = (model_override or profile.model or "").strip()
+        if chosen_model:
+            kwargs["model"] = chosen_model
         active_key = (self.gemini_api_key or os.environ.get("GEMINI_API_KEY", "")).strip()
         if active_key:
             kwargs["api_key"] = active_key
-            # Only enable Vertex mode if explicitly requested via USE_VERTEX_AI=true or force_vertex=True.
-            # Google AI Studio keys (both AIzaSy... and AQ....) work directly with the free Gemini API (vertex=False)!
             if force_vertex is True or os.environ.get("USE_VERTEX_AI", "").lower() == "true":
                 kwargs["vertex"] = True
 
@@ -508,24 +512,67 @@ class MultiAgentOrchestrator:
             )
             return
 
-        # Full Google Antigravity SDK Execution
+        # Full Google Antigravity SDK Execution with Automatic High-Demand Failover
         try:
-            config = self._build_sdk_config(profile, emit)
             full_text: List[str] = []
-            async with Agent(config=config) as agent:
-                response = await agent.chat(prompt)
+            # If user didn't lock a specific model on Gemini, try default first with fast 8s timeout,
+            # then fail over to gemini-3.1-flash-lite if default hits 503 High Demand
+            candidate_models = (
+                [profile.model.strip(), "gemini-3.1-flash-lite"]
+                if profile.provider == "gemini"
+                else [profile.model.strip()]
+            )
+            last_exc: Optional[Exception] = None
 
-                # Stream response tokens directly so we never block on response.thoughts first!
-                async for token in response:
-                    chunk = str(token)
-                    full_text.append(chunk)
-                    await emit(
-                        {
-                            "type": "token_delta",
-                            "agent_id": profile.id,
-                            "delta": chunk,
-                        }
+            for idx, cand_model in enumerate(candidate_models):
+                try:
+                    config = self._build_sdk_config(
+                        profile,
+                        emit,
+                        model_override=cand_model or None,
+                        fail_fast=True,
                     )
+                    async with Agent(config=config) as agent:
+                        response = await agent.chat(prompt)
+                        stream_iter = response.__aiter__()
+                        while True:
+                            try:
+                                token = await asyncio.wait_for(stream_iter.__anext__(), timeout=12.0)
+                                chunk = str(token)
+                                full_text.append(chunk)
+                                await emit(
+                                    {
+                                        "type": "token_delta",
+                                        "agent_id": profile.id,
+                                        "delta": chunk,
+                                    }
+                                )
+                            except StopAsyncIteration:
+                                break
+                    if full_text:
+                        last_exc = None
+                        break
+                except Exception as attempt_exc:
+                    last_exc = attempt_exc
+                    err_s = str(attempt_exc)
+                    # If first model had 503 High Demand or Timeout, automatically switch to fast lite model
+                    if (
+                        idx == 0
+                        and len(candidate_models) > 1
+                        and ("503" in err_s or "UNAVAILABLE" in err_s or isinstance(attempt_exc, asyncio.TimeoutError))
+                    ):
+                        await emit(
+                            {
+                                "type": "thought_delta",
+                                "agent_id": profile.id,
+                                "delta": "Primary model experiencing temporary 503 high demand; switching to fast `gemini-3.1-flash-lite`...\n",
+                            }
+                        )
+                        continue
+                    raise attempt_exc
+
+            if last_exc is not None and not full_text:
+                raise last_exc
 
             final_answer = "".join(full_text)
             self.conversation_history[agent_id].append(
