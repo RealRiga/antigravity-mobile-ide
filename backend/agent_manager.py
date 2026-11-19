@@ -111,13 +111,13 @@ class MultiAgentOrchestrator:
         presets = [
             AgentProfile(
                 id="ollama-coder",
-                name="Ollama Local Coder",
-                role="Fast Local & Custom Model Engineer",
+                name="OwnStack Local AI",
+                role="Local & Custom Model Engineer",
                 provider="ollama",
                 model="gemma4:26b",
                 base_url=f"{self.ollama_base_url.rstrip('/')}/v1",
                 system_instructions=(
-                    "You are an expert coding agent inside OwnStack Antigravity IDE. "
+                    "You are an expert coding agent inside OwnStack IDE. "
                     "When asked about commits, diffs, or code changes, ALWAYS inspect and include "
                     "the actual code diff (`git show` or `git diff`), modified files, and clear code blocks."
                 ),
@@ -127,13 +127,13 @@ class MultiAgentOrchestrator:
             ),
             AgentProfile(
                 id="ollama-custom-trainer",
-                name="My Fine-Tuned AI (Ollama)",
+                name="OwnStack Custom Model",
                 role="Custom Trained Local Model",
                 provider="ollama",
                 model="qwen2.5-coder:7b",
                 base_url=f"{self.ollama_base_url.rstrip('/')}/v1",
                 system_instructions=(
-                    "You are the developer's custom local model running on Ollama. "
+                    "You are the developer's custom local model inside OwnStack IDE. "
                     "Assist with refactoring, debugging, and dataset/training script preparation."
                 ),
                 require_approval_for=[],
@@ -141,13 +141,14 @@ class MultiAgentOrchestrator:
                 use_lightweight=True,
             ),
             AgentProfile(
-                id="gemini-lead-architect",
-                name="Gemini Lead Architect (+Subagents)",
+                id="cloud-lead-architect",
+                name="OwnStack Cloud AI",
                 role="Multi-Agent Coordinator & Lead Engineer",
-                provider="gemini",
+                provider="cloud",
                 model="gemini-3.1-flash-lite",
                 system_instructions=(
-                    "You are the Lead Software Architect inside OwnStack Antigravity IDE. "
+                    "You are the Lead Software Architect inside OwnStack IDE. "
+                    "Always refer to this workspace simply as OwnStack IDE. "
                     "When asked about commits, files, or code changes, ALWAYS inspect and display "
                     "the actual changed files, commit stats, and code diff blocks (`git show --stat -p -1`) "
                     "formatted cleanly in fenced markdown code blocks."
@@ -160,12 +161,12 @@ class MultiAgentOrchestrator:
             ),
             AgentProfile(
                 id="litert-on-device",
-                name="LiteRT On-Device (Gemma 4 26B)",
+                name="OwnStack On-Device AI",
                 role="Zero-Latency On-Device GPU/NPU Agent",
                 provider="litert",
                 model="~/.litert-lm/models/gemma4-26b/model.litertlm",
                 system_instructions=(
-                    "You run 100% locally via Google LiteRT-LM with zero cloud dependency."
+                    "You run 100% locally inside OwnStack IDE with zero cloud dependency."
                 ),
                 require_approval_for=[],
                 enable_subagents=False,
@@ -492,16 +493,14 @@ class MultiAgentOrchestrator:
                 )
                 return
 
-        if profile.provider == "gemini" and not (self.gemini_api_key or os.environ.get("GEMINI_API_KEY")):
+        if profile.provider in ("cloud", "gemini") and not (self.gemini_api_key or os.environ.get("GEMINI_API_KEY")):
             await self._run_interactive_sandbox_fallback(
                 profile,
                 prompt,
                 emit,
                 notice=(
-                    "No `GEMINI_API_KEY` set yet (get one at https://aistudio.google.com/app/api-keys "
-                    "or add it in the **Settings / Agents** tab). "
-                    "Running in **Interactive Mobile Workspace Preview** so you can test "
-                    "mobile approval gates, subagent delegation, and code diffs!"
+                    "No Cloud AI API key set yet. Add your API key in the **Agents & Config** tab "
+                    "to enable live Cloud AI responses."
                 ),
             )
             return
@@ -525,7 +524,7 @@ class MultiAgentOrchestrator:
             # then fail over to gemini-3.1-flash-lite if default hits 503 High Demand
             candidate_models = (
                 [profile.model.strip(), "gemini-3.1-flash-lite"]
-                if profile.provider == "gemini"
+                if profile.provider in ("cloud", "gemini")
                 else [profile.model.strip()]
             )
             last_exc: Optional[Exception] = None

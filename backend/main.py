@@ -34,8 +34,8 @@ WORKSPACE_DIR = os.environ.get("AGY_WORKSPACE_DIR", PROJECT_ROOT)
 AGY_ACCESS_PIN = os.environ.get("AGY_ACCESS_PIN", "").strip()
 
 app = FastAPI(
-    title="Antigravity Mobile Companion API",
-    description="Mobile IDE & Multi-Agent Orchestrator powered by Google Antigravity SDK & Ollama",
+    title="OwnStack IDE API",
+    description="OwnStack Multi-Agent Mobile & Desktop IDE",
     version="1.0.0",
 )
 
@@ -76,7 +76,7 @@ async def public_cron_health() -> Dict[str, Any]:
     active_pin = os.environ.get("AGY_ACCESS_PIN", "").strip()
     return {
         "status": "awake",
-        "service": "ownstack-antigravity-ide",
+        "service": "ownstack-ide",
         "pin_required": bool(active_pin),
     }
 
@@ -309,6 +309,18 @@ async def read_workspace_file(path: str) -> Dict[str, Any]:
         return git_manager.read_file(path)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/files/raw")
+async def read_raw_workspace_file(path: str) -> FileResponse:
+    """Serves raw binary/image files (PNG, JPEG, WEBP, GIF, SVG, etc.) for the Explorer image preview."""
+    try:
+        full_path = git_manager._resolve_safe_path(path)
+        if not os.path.isfile(full_path):
+            raise HTTPException(status_code=404, detail="File not found")
+        return FileResponse(full_path)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

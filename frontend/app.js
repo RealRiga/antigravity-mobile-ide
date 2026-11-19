@@ -9,10 +9,10 @@
 
 const state = {
   agents: [],
-  activeAgentId: "gemini-lead-architect",
+  activeAgentId: "cloud-lead-architect",
   lastOllamaAgentId: "ollama-coder",
-  lastGeminiAgentId: "gemini-lead-architect",
-  welcomeEngine: "gemini",
+  lastCloudAgentId: "cloud-lead-architect",
+  welcomeEngine: "cloud",
   ws: null,
   pendingChatQueue: [],
   currentApprovalId: null,
@@ -32,7 +32,7 @@ const state = {
 const welcomeScreen = document.getElementById("welcome-screen");
 const btnGetStarted = document.getElementById("btn-get-started");
 const btnShowWelcome = document.getElementById("btn-show-welcome");
-const welcomePickGemini = document.getElementById("welcome-pick-gemini");
+const welcomePickCloud = document.getElementById("welcome-pick-cloud");
 const welcomePickOllama = document.getElementById("welcome-pick-ollama");
 
 const pinDialog = document.getElementById("pin-dialog");
@@ -53,10 +53,9 @@ const chatInput = document.getElementById("chat-input");
 const btnSendChat = document.getElementById("btn-send-chat");
 const chatAgentProviderBadge = document.getElementById("chat-agent-provider-badge");
 const chatAgentRole = document.getElementById("chat-agent-role");
-const chatSubagentCount = document.getElementById("chat-subagent-count");
 
 const btnToggleOllama = document.getElementById("btn-toggle-ollama");
-const btnToggleGemini = document.getElementById("btn-toggle-gemini");
+const btnToggleCloud = document.getElementById("btn-toggle-cloud");
 const btnThemeToggle = document.getElementById("btn-theme-toggle");
 const btnWelcomeTheme = document.getElementById("btn-welcome-theme");
 
@@ -137,17 +136,21 @@ if (localStorage.getItem("agy_onboarded") === "true") {
   welcomeScreen.classList.add("hidden");
 }
 
-welcomePickGemini.addEventListener("click", () => {
-  state.welcomeEngine = "gemini";
-  welcomePickGemini.classList.add("ring-2", "ring-indigo-500/80");
-  welcomePickOllama.classList.remove("ring-2", "ring-emerald-500/80");
-});
+if (welcomePickCloud) {
+  welcomePickCloud.addEventListener("click", () => {
+    state.welcomeEngine = "cloud";
+    welcomePickCloud.classList.add("ring-2", "ring-indigo-500/80");
+    welcomePickOllama.classList.remove("ring-2", "ring-emerald-500/80");
+  });
+}
 
-welcomePickOllama.addEventListener("click", () => {
-  state.welcomeEngine = "ollama";
-  welcomePickOllama.classList.add("ring-2", "ring-emerald-500/80");
-  welcomePickGemini.classList.remove("ring-2", "ring-indigo-500/80");
-});
+if (welcomePickOllama) {
+  welcomePickOllama.addEventListener("click", () => {
+    state.welcomeEngine = "ollama";
+    welcomePickOllama.classList.add("ring-2", "ring-emerald-500/80");
+    if (welcomePickCloud) welcomePickCloud.classList.remove("ring-2", "ring-indigo-500/80");
+  });
+}
 
 btnGetStarted.addEventListener("click", async () => {
   localStorage.setItem("agy_onboarded", "true");
@@ -239,19 +242,23 @@ window.addEventListener("storage", (e) => {
   }
 });
 
-// 4. Segmented Ollama <-> Gemini Engine Switcher
+// 4. Segmented Local (Ollama) <-> Cloud AI Engine Switcher
 function switchEngineProvider(targetProvider) {
-  const matching = state.agents.filter((a) => a.provider === targetProvider);
+  const matching = state.agents.filter((a) =>
+    targetProvider === "cloud"
+      ? a.provider === "cloud" || a.provider === "gemini"
+      : a.provider === targetProvider
+  );
   if (matching.length === 0) return;
 
   if (targetProvider === "ollama") {
     const pick = matching.find((a) => a.id === state.lastOllamaAgentId) || matching[0];
     state.activeAgentId = pick.id;
     state.lastOllamaAgentId = pick.id;
-  } else if (targetProvider === "gemini") {
-    const pick = matching.find((a) => a.id === state.lastGeminiAgentId) || matching[0];
+  } else if (targetProvider === "cloud") {
+    const pick = matching.find((a) => a.id === state.lastCloudAgentId) || matching[0];
     state.activeAgentId = pick.id;
-    state.lastGeminiAgentId = pick.id;
+    state.lastCloudAgentId = pick.id;
   }
 
   renderAgentSelect();
@@ -259,16 +266,16 @@ function switchEngineProvider(targetProvider) {
   renderAgentsRoster();
 }
 
-btnToggleOllama.addEventListener("click", () => switchEngineProvider("ollama"));
-btnToggleGemini.addEventListener("click", () => switchEngineProvider("gemini"));
+if (btnToggleOllama) btnToggleOllama.addEventListener("click", () => switchEngineProvider("ollama"));
+if (btnToggleCloud) btnToggleCloud.addEventListener("click", () => switchEngineProvider("cloud"));
 
 const newAgentProviderSelect = document.getElementById("new-agent-provider");
 const newAgentModelInput = document.getElementById("new-agent-model");
 if (newAgentProviderSelect && newAgentModelInput) {
   newAgentProviderSelect.addEventListener("change", () => {
-    if (newAgentProviderSelect.value === "gemini") {
+    if (newAgentProviderSelect.value === "cloud") {
       newAgentModelInput.value = "";
-      newAgentModelInput.placeholder = "Blank for SDK default (gemini-3.8-flash)";
+      newAgentModelInput.placeholder = "Blank for default Cloud AI model";
     } else if (newAgentProviderSelect.value === "ollama") {
       newAgentModelInput.value = "gemma4:26b";
       newAgentModelInput.placeholder = "e.g., gemma4:26b or qwen2.5-coder:7b";
@@ -350,12 +357,12 @@ async function refreshHealth() {
       const parts = data.workspace_dir.split("/").filter(Boolean);
       headerWorkspaceName.textContent = parts[parts.length - 1] || "workspace";
     }
-    const geminiState = data.has_gemini_key ? "Gemini Ready" : "Gemini";
+    const cloudState = data.has_gemini_key ? "Cloud AI Ready" : "Cloud AI";
     if (ollamaStatusPill) {
       if (data.ollama && data.ollama.online) {
-        ollamaStatusPill.textContent = `Ollama (${data.ollama.models.length}) • ${geminiState}`;
+        ollamaStatusPill.textContent = `Local (${data.ollama.models.length}) • ${cloudState}`;
       } else {
-        ollamaStatusPill.textContent = `${geminiState} • Ollama Standby`;
+        ollamaStatusPill.textContent = `${cloudState} • Local Standby`;
       }
     }
   } catch (err) {}
@@ -403,25 +410,19 @@ function updateActiveAgentStrip() {
   const agent = state.agents.find((a) => a.id === state.activeAgentId);
   if (!agent) return;
 
-  btnToggleOllama.classList.remove("is-active");
-  btnToggleGemini.classList.remove("is-active");
+  if (btnToggleOllama) btnToggleOllama.classList.remove("is-active");
+  if (btnToggleCloud) btnToggleCloud.classList.remove("is-active");
   if (agent.provider === "ollama") {
-    btnToggleOllama.classList.add("is-active");
-    if (chatAgentProviderBadge) chatAgentProviderBadge.textContent = "OLLAMA";
-  } else if (agent.provider === "gemini") {
-    btnToggleGemini.classList.add("is-active");
-    if (chatAgentProviderBadge) chatAgentProviderBadge.textContent = "GEMINI";
+    if (btnToggleOllama) btnToggleOllama.classList.add("is-active");
+    if (chatAgentProviderBadge) chatAgentProviderBadge.textContent = "LOCAL AI";
+  } else if (agent.provider === "cloud" || agent.provider === "gemini") {
+    if (btnToggleCloud) btnToggleCloud.classList.add("is-active");
+    if (chatAgentProviderBadge) chatAgentProviderBadge.textContent = "CLOUD AI";
   } else {
-    if (chatAgentProviderBadge) chatAgentProviderBadge.textContent = "LITERT";
+    if (chatAgentProviderBadge) chatAgentProviderBadge.textContent = "ON-DEVICE";
   }
 
   if (chatAgentRole) chatAgentRole.textContent = agent.role;
-  const subCount = agent.enable_subagents && agent.subagents ? agent.subagents.length : 0;
-  const gateCount = (agent.require_approval_for || []).length;
-  if (chatSubagentCount) {
-    chatSubagentCount.textContent =
-      subCount > 0 ? `${subCount} Subagents • ${gateCount} Gates` : `${gateCount} Gates`;
-  }
 }
 
 // 7. WebSocket Streaming & Mobile Approval Gates
@@ -484,21 +485,38 @@ async function withButtonLoader(btn, loadingText, actionFn) {
   }
 }
 
+function updateSendButtonState() {
+  if (!btnSendChat) return;
+  const hasText = chatInput && chatInput.value.trim().length > 0;
+  if (state.isGenerating) {
+    btnSendChat.disabled = true;
+    btnSendChat.innerHTML = RUNNING_SPINNER_SVG;
+    btnSendChat.classList.add("opacity-60", "cursor-not-allowed");
+    btnSendChat.classList.remove("opacity-35");
+  } else if (!hasText) {
+    btnSendChat.disabled = true;
+    btnSendChat.innerHTML = SEND_ARROW_SVG;
+    btnSendChat.classList.add("opacity-35", "cursor-not-allowed");
+    btnSendChat.classList.remove("opacity-60");
+  } else {
+    btnSendChat.disabled = false;
+    btnSendChat.innerHTML = SEND_ARROW_SVG;
+    btnSendChat.classList.remove("opacity-35", "opacity-60", "cursor-not-allowed");
+  }
+}
+
 function setGeneratingState(running) {
   state.isGenerating = Boolean(running);
-  if (btnSendChat) {
-    btnSendChat.disabled = state.isGenerating;
-    btnSendChat.innerHTML = state.isGenerating ? RUNNING_SPINNER_SVG : SEND_ARROW_SVG;
-    if (state.isGenerating) {
-      btnSendChat.classList.add("opacity-60", "cursor-not-allowed");
-    } else {
-      btnSendChat.classList.remove("opacity-60", "cursor-not-allowed");
-    }
-  }
+  updateSendButtonState();
   document.querySelectorAll(".quick-prompt-btn").forEach((b) => {
     b.disabled = state.isGenerating;
   });
 }
+
+if (chatInput) {
+  chatInput.addEventListener("input", updateSendButtonState);
+}
+updateSendButtonState();
 
 function escapeHtml(str) {
   const div = document.createElement("div");
@@ -507,21 +525,31 @@ function escapeHtml(str) {
 }
 
 function highlightCodeLine(line) {
-  let s = escapeHtml(line);
-  // Comments (# or //)
-  if (/^\s*(#|\/\/)/.test(s)) {
-    return `<span class="tok-com">${s}</span>`;
+  // Single-pass tokenizer so generated <span class="..."> HTML is NEVER corrupted by later regexes!
+  const escaped = escapeHtml(line);
+  if (/^\s*(#|\/\/|\/\*|\*)/.test(escaped)) {
+    return `<span class="tok-com">${escaped}</span>`;
   }
-  // Strings
-  s = s.replace(/(&quot;.*?&quot;|&#39;.*?&#39;|"[^"]*"|'[^']*')/g, '<span class="tok-str">$1</span>');
-  // Keywords
-  s = s.replace(
-    /\b(def|class|async|await|return|import|from|if|elif|else|for|while|try|except|finally|with|as|const|let|var|function|export|default|true|false|null|None|True|False|in|not|and|or)\b/g,
-    '<span class="tok-kw">$1</span>'
-  );
-  // Numbers
-  s = s.replace(/\b(\d+(\.\d+)?)\b/g, '<span class="tok-num">$1</span>');
-  return s;
+  const tokenRegex =
+    /(&quot;[^&]*?&quot;|&#39;[^&]*?&#39;|"[^"]*"|'[^']*'|&lt;\/?[a-zA-Z0-9_-]+|\/?&gt;|\b(?:def|class|async|await|return|import|from|if|elif|else|for|while|try|except|finally|with|as|const|let|var|function|export|default|true|false|null|None|True|False|in|not|and|or)\b|\b\d+(?:\.\d+)?\b)/g;
+
+  return escaped.replace(tokenRegex, (match) => {
+    if (
+      match.startsWith("&quot;") ||
+      match.startsWith("&#39;") ||
+      match.startsWith('"') ||
+      match.startsWith("'")
+    ) {
+      return `<span class="tok-str">${match}</span>`;
+    }
+    if (match.startsWith("&lt;") || match.endsWith("&gt;")) {
+      return `<span class="tok-tag">${match}</span>`;
+    }
+    if (/^\d/.test(match)) {
+      return `<span class="tok-num">${match}</span>`;
+    }
+    return `<span class="tok-kw">${match}</span>`;
+  });
 }
 
 function formatSimpleMarkdown(text) {
@@ -724,6 +752,7 @@ chatForm.addEventListener("submit", (e) => {
   sendChatPrompt(chatInput.value);
   chatInput.value = "";
   chatInput.style.height = "auto";
+  updateSendButtonState();
 });
 
 // Send on Enter (without Shift), allow new line with Shift+Enter
@@ -733,6 +762,7 @@ chatInput.addEventListener("keydown", (e) => {
     sendChatPrompt(chatInput.value);
     chatInput.value = "";
     chatInput.style.height = "auto";
+    updateSendButtonState();
   }
 });
 
@@ -1046,61 +1076,100 @@ function detectLanguageLabel(filepath) {
   return map[ext] || "Code / Text";
 }
 
+const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp"]);
+
+function isImagePath(filepath) {
+  const ext = (filepath.split(".").pop() || "").toLowerCase();
+  return IMAGE_EXTENSIONS.has(ext);
+}
+
 function renderSyntaxHighlightedFile(content) {
   const viewer = document.getElementById("file-syntax-viewer");
   if (!viewer) return;
   const lines = (content || "").split("\n");
-  viewer.innerHTML = lines
+  // Render inside a single min-w-max block so all lines scroll horizontally together like VS Code!
+  const rows = lines
     .map(
-      (line, idx) => `
-      <div class="flex items-baseline gap-3 px-1 hover:bg-zinc-500/5 rounded">
-        <span class="w-8 shrink-0 text-right text-[10px] text-tertiary select-none">${idx + 1}</span>
-        <span class="flex-1 whitespace-pre overflow-x-auto">${highlightCodeLine(line) || "&nbsp;"}</span>
-      </div>`
+      (line, idx) =>
+        `<div class="flex items-start gap-3 px-1 hover:bg-zinc-500/5"><span class="w-9 shrink-0 text-right text-[10px] text-tertiary select-none pr-2 border-r pro-border">${
+          idx + 1
+        }</span><span class="whitespace-pre">${highlightCodeLine(line) || " "}</span></div>`
     )
     .join("");
+  viewer.innerHTML = `<div class="min-w-max">${rows}</div>`;
 }
 
 async function openFileInEditor(path) {
-  const res = await fetch(`/api/files/read?path=${encodeURIComponent(path)}`);
-  if (!res.ok) return;
-  const data = await res.json();
-  state.currentFilePath = data.path;
-  state.currentFileDiff = data.diff || "";
+  state.currentFilePath = path;
   state.showingDiff = false;
   state.editingFile = false;
 
-  document.getElementById("current-file-label").textContent = data.path;
-  const langBadge = document.getElementById("editor-lang-badge");
-  const lineCount = document.getElementById("editor-line-count");
-  if (langBadge) langBadge.textContent = detectLanguageLabel(data.path);
-  if (lineCount) lineCount.textContent = `${data.lines || 0} lines`;
-
+  document.getElementById("current-file-label").textContent = path;
   if (window.innerWidth < 1024) {
     document.getElementById("file-tree-pane").classList.add("hidden");
   }
   const editorPane = document.getElementById("file-editor-pane");
   editorPane.classList.remove("hidden");
   editorPane.classList.add("flex");
-
   document.getElementById("btn-back-to-tree").classList.remove("hidden");
-  document.getElementById("btn-save-file").classList.add("hidden");
-  const btnEditMode = document.getElementById("btn-toggle-edit-mode");
-  if (btnEditMode) {
-    btnEditMode.classList.remove("hidden");
-    btnEditMode.textContent = "Edit File";
-  }
-  document.getElementById("btn-toggle-file-diff").classList.remove("hidden");
-  document.getElementById("btn-toggle-file-diff").textContent = "View Diff";
 
   const wrapper = document.getElementById("code-editor-wrapper");
+  const imgViewer = document.getElementById("file-image-viewer");
+  const imgPreview = document.getElementById("file-image-preview");
+  const imgMeta = document.getElementById("file-image-meta");
   const syntaxViewer = document.getElementById("file-syntax-viewer");
   const textarea = document.getElementById("file-editor-textarea");
   const diffViewer = document.getElementById("file-diff-viewer");
+  const btnEditMode = document.getElementById("btn-toggle-edit-mode");
+  const btnDiff = document.getElementById("btn-toggle-file-diff");
+  const btnSave = document.getElementById("btn-save-file");
+  const langBadge = document.getElementById("editor-lang-badge");
+  const lineCount = document.getElementById("editor-line-count");
+
   if (wrapper) wrapper.classList.remove("hidden");
+  diffViewer.classList.add("hidden");
+
+  // 1. Handle Image Files (Render actual image via /api/files/raw instead of binary gibberish!)
+  if (isImagePath(path)) {
+    if (syntaxViewer) syntaxViewer.classList.add("hidden");
+    textarea.classList.add("hidden");
+    if (btnEditMode) btnEditMode.classList.add("hidden");
+    if (btnDiff) btnDiff.classList.add("hidden");
+    if (btnSave) btnSave.classList.add("hidden");
+    if (langBadge) langBadge.textContent = "Image Preview";
+    if (lineCount) lineCount.textContent = (path.split(".").pop() || "").toUpperCase();
+
+    if (imgViewer && imgPreview) {
+      imgViewer.classList.remove("hidden");
+      const pinParam = state.accessPin ? `&pin=${encodeURIComponent(state.accessPin)}` : "";
+      imgPreview.src = `/api/files/raw?path=${encodeURIComponent(path)}${pinParam}`;
+      if (imgMeta) imgMeta.textContent = path;
+    }
+    return;
+  }
+
+  // 2. Handle Text / Code Files
+  if (imgViewer) imgViewer.classList.add("hidden");
+  const res = await fetch(`/api/files/read?path=${encodeURIComponent(path)}`);
+  if (!res.ok) return;
+  const data = await res.json();
+  state.currentFileDiff = data.diff || "";
+
+  if (langBadge) langBadge.textContent = detectLanguageLabel(data.path);
+  if (lineCount) lineCount.textContent = `${data.lines || 0} lines`;
+
+  if (btnSave) btnSave.classList.add("hidden");
+  if (btnEditMode) {
+    btnEditMode.classList.remove("hidden");
+    btnEditMode.textContent = "Edit";
+  }
+  if (btnDiff) {
+    btnDiff.classList.remove("hidden");
+    btnDiff.textContent = "Diff";
+  }
+
   if (syntaxViewer) syntaxViewer.classList.remove("hidden");
   textarea.classList.add("hidden");
-  diffViewer.classList.add("hidden");
   textarea.value = data.content;
   renderSyntaxHighlightedFile(data.content);
 }
@@ -1355,9 +1424,9 @@ function renderAgentsRoster() {
         </button>
       </div>
       <div class="text-[11px] font-mono text-secondary bg-elevated border pro-border rounded-xl p-2.5 space-y-1">
-        <div>Model: <span class="text-primary font-medium">${escapeHtml(a.model || "gemini-3.8-flash (SDK default)")}</span></div>
+        <div>Model: <span class="text-primary font-medium">${escapeHtml(a.model || "cloud-default")}</span></div>
         ${isOllama ? `<div>Endpoint: <span class="text-primary">${escapeHtml(a.base_url)}</span></div>` : ""}
-        <div>Approval Gates: <span class="text-primary">${escapeHtml((a.require_approval_for || []).join(", ") || "None")}</span></div>
+        <div>Approval Gates: <span class="text-primary">${escapeHtml((a.require_approval_for || []).join(", ") || "Destructive Commands Only")}</span></div>
         ${subNames ? `<div>Subagents: <span class="text-primary">${escapeHtml(subNames)}</span></div>` : ""}
       </div>
     `;

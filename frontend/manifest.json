@@ -1,7 +1,7 @@
 {
-  "name": "OwnStack Antigravity IDE",
+  "name": "OwnStack IDE",
   "short_name": "OwnStack IDE",
-  "description": "Multi-Agent Desktop & Mobile IDE powered by OwnStack, Google Antigravity SDK & Ollama",
+  "description": "Multi-Agent Desktop & Mobile IDE by OwnStack",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

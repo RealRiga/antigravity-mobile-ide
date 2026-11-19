@@ -16,7 +16,7 @@
   <link rel="icon" type="image/jpeg" href="/static/ownstack-logo.jpeg" />
   <link rel="apple-touch-icon" href="/static/ownstack-logo.jpeg" />
   <link rel="manifest" href="/manifest.json" />
-  <title>OwnStack — Antigravity Multi-Agent IDE</title>
+  <title>OwnStack IDE — Multi-Agent Coding Workspace</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
@@ -26,55 +26,50 @@
   <!-- WELCOME / GET STARTED ONBOARDING VIEW                                 -->
   <!-- ===================================================================== -->
   <div id="welcome-screen" class="fixed inset-0 z-40 bg-canvas flex flex-col justify-between overflow-y-auto px-5 py-6">
-    <!-- Top Brand & Theme Bar -->
     <div class="max-w-3xl w-full mx-auto flex items-center justify-between gap-2">
       <div class="flex items-center gap-2.5 min-w-0">
         <img src="/static/ownstack-logo.jpeg" alt="OwnStack Logo" class="w-9 h-9 rounded-xl object-cover border pro-border shadow-sm shrink-0" />
         <div class="flex items-center gap-1.5 flex-wrap min-w-0">
-          <span class="font-bold text-sm text-primary tracking-tight whitespace-nowrap">Own_Stack</span>
-          <span class="text-[11px] font-medium px-2 py-0.5 rounded-full pro-pill text-secondary whitespace-nowrap">Antigravity IDE</span>
+          <span class="font-bold text-sm text-primary tracking-tight whitespace-nowrap">OwnStack IDE</span>
+          <span class="text-[11px] font-medium px-2 py-0.5 rounded-full pro-pill text-secondary whitespace-nowrap">MIT Open Source</span>
         </div>
       </div>
-      <div class="flex items-center gap-2 shrink-0">
-        <button id="btn-welcome-theme" type="button" aria-label="Toggle Light, Dark, or System theme"
-          class="w-9 h-9 rounded-full pro-pill flex items-center justify-center hover:opacity-80 transition">
-          <svg id="welcome-theme-svg" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
-          </svg>
-        </button>
-      </div>
+      <button id="btn-welcome-theme" type="button" aria-label="Toggle Light, Dark, or System theme"
+        class="w-9 h-9 rounded-full pro-pill flex items-center justify-center hover:opacity-80 transition shrink-0">
+        <svg id="welcome-theme-svg" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+        </svg>
+      </button>
     </div>
 
-    <!-- Center Editorial Hero -->
     <div class="max-w-2xl w-full mx-auto my-auto py-8 space-y-6">
       <div class="space-y-3">
         <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full pro-pill text-xs font-medium text-secondary">
           <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-          <span>OwnStack • Google Antigravity Multi-Agent Runtime</span>
+          <span>OwnStack IDE • Multi-Agent Mobile &amp; Desktop Workspace</span>
         </div>
         <h1 class="text-3xl sm:text-5xl font-bold tracking-tight text-primary leading-[1.12]">
           Code on PC or mobile with autonomous agents.
         </h1>
         <p class="text-sm sm:text-base text-secondary leading-relaxed">
-          Switch seamlessly between <strong>GitHub repositories</strong>, orchestrate local <strong>Ollama</strong> models and cloud <strong>Gemini</strong> subagents, review diffs, approve tool gates, and ship from anywhere.
+          Switch seamlessly between <strong>GitHub repositories</strong>, orchestrate <strong>Local Ollama</strong> models and <strong>Cloud AI</strong> subagents, preview images &amp; syntax-highlighted code, and ship from anywhere.
         </p>
       </div>
 
-      <!-- Choose Starting Engine before Launching -->
       <div class="space-y-2.5">
         <span class="block text-xs font-semibold uppercase tracking-wider text-tertiary">Select Active AI Engine</span>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <button type="button" id="welcome-pick-gemini"
+          <button type="button" id="welcome-pick-cloud"
             class="pro-card text-left rounded-2xl p-4 hover:border-indigo-500 transition flex flex-col justify-between gap-2 ring-2 ring-indigo-500/80">
             <div class="flex items-center justify-between">
               <span class="text-xs font-semibold text-primary flex items-center gap-1.5">
                 <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
-                Gemini + Subagents
+                Cloud AI + Subagents
               </span>
               <span class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600">Cloud 24/7</span>
             </div>
             <p class="text-xs text-secondary leading-normal">
-              Hierarchical multi-agent coordinator with <code class="text-[11px]">code_researcher</code> &amp; <code class="text-[11px]">test_specialist</code>. Works even when your PC is off.
+              Autonomous multi-agent coordinator with <code class="text-[11px]">code_researcher</code> &amp; <code class="text-[11px]">test_specialist</code>. Works even when your PC is off.
             </p>
           </button>
 
@@ -83,18 +78,17 @@
             <div class="flex items-center justify-between">
               <span class="text-xs font-semibold text-primary flex items-center gap-1.5">
                 <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                Ollama Local Models
+                Local AI (Ollama)
               </span>
               <span class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600">Local / Custom PC</span>
             </div>
             <p class="text-xs text-secondary leading-normal">
-              Connect <code class="text-[11px]">LocalOpenAIAgentConfig</code> to your own Ollama server (<code class="text-[11px]">gemma4:26b</code>, <code class="text-[11px]">qwen2.5-coder</code>, or custom models).
+              Connect to your own Ollama server (<code class="text-[11px]">gemma4:26b</code>, <code class="text-[11px]">qwen2.5-coder</code>, or custom fine-tuned models).
             </p>
           </button>
         </div>
       </div>
 
-      <!-- Primary Get Started CTA + Read Documentation Button -->
       <div class="pt-1 flex flex-col sm:flex-row gap-2.5">
         <button id="btn-get-started" type="button"
           class="flex-1 btn-primary-pro rounded-2xl py-3.5 px-6 text-sm font-semibold flex items-center justify-center gap-2 shadow-sm">
@@ -113,9 +107,8 @@
       </div>
     </div>
 
-    <!-- Footer License & GitHub Credit -->
     <div class="max-w-3xl w-full mx-auto flex items-center justify-between text-[11px] text-tertiary border-t pro-border pt-4">
-      <span>MIT Licensed • OwnStack &amp; Google Antigravity SDK</span>
+      <span>MIT Licensed • OwnStack IDE</span>
       <a href="https://github.com/RealRiga/antigravity-mobile-ide" target="_blank" rel="noopener" class="underline hover:opacity-80">
         GitHub Repository
       </a>
@@ -123,30 +116,26 @@
   </div>
 
   <!-- ===================================================================== -->
-  <!-- TOP HEADER BAR (Responsive Wrap on Mobile + Single Row on Desktop)    -->
+  <!-- CLEAN SINGLE-ROW RESPONSIVE TOP HEADER BAR                            -->
   <!-- ===================================================================== -->
-  <header class="shrink-0 bg-canvas border-b pro-border px-3 py-2 flex flex-wrap items-center justify-between gap-2 z-20">
-    <!-- Left: OwnStack Logo + Brand Name + Active Repo Badge -->
-    <div class="flex items-center gap-2 min-w-0">
-      <button id="btn-show-welcome" type="button" title="Open Welcome Page"
+  <header class="shrink-0 bg-canvas border-b pro-border px-2.5 sm:px-4 h-13 py-2 flex items-center justify-between gap-2 z-20">
+    <!-- Left: Logo + Repo Pill + Privacy Eye -->
+    <div class="flex items-center gap-1.5 sm:gap-2 min-w-0">
+      <button id="btn-show-welcome" type="button" title="OwnStack IDE Welcome"
         class="flex items-center gap-2 shrink-0 hover:opacity-85 transition">
-        <img src="/static/ownstack-logo.jpeg" alt="OwnStack" class="w-8 h-8 rounded-xl object-cover border pro-border shadow-sm" />
-        <span class="font-bold text-sm text-primary tracking-tight hidden sm:inline">Own_Stack</span>
+        <img src="/static/ownstack-logo.jpeg" alt="OwnStack IDE" class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg object-cover border pro-border shadow-sm" />
+        <span class="font-bold text-sm text-primary tracking-tight hidden md:inline">OwnStack IDE</span>
       </button>
 
-      <span class="text-tertiary text-xs hidden sm:inline">/</span>
-
-      <!-- Active Workspace Repo Pill (Clicks to open GitHub Repos view) -->
       <button id="btn-active-repo-pill" type="button" title="Switch GitHub Repository"
-        class="pro-pill px-2.5 py-1 rounded-lg text-xs font-mono font-medium text-primary flex items-center gap-1.5 min-w-0 max-w-[130px] sm:max-w-[220px] hover:border-emerald-500 transition">
+        class="pro-pill px-2 py-1 rounded-lg text-[11px] sm:text-xs font-mono font-medium text-primary flex items-center gap-1.5 min-w-0 max-w-[105px] sm:max-w-[200px] hover:border-emerald-500 transition">
         <svg class="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
-        <span id="header-workspace-name" class="repo-obscurable truncate">antigravity-mobile-ide</span>
+        <span id="header-workspace-name" class="repo-obscurable truncate">workspace</span>
       </button>
 
-      <!-- Privacy Eye Button: Obscure / Reveal Repo Names in Public -->
-      <button id="btn-toggle-obscure" type="button" title="Obscure / Hide Repo Names in Public" aria-label="Toggle repository name privacy blur"
+      <button id="btn-toggle-obscure" type="button" title="Hide / Show Repo Names in Public" aria-label="Toggle repo name privacy blur"
         class="pro-pill w-7 h-7 rounded-lg flex items-center justify-center text-secondary hover:opacity-80 transition shrink-0">
         <svg id="obscure-eye-svg" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -154,39 +143,36 @@
       </button>
     </div>
 
-    <!-- Right: 1-Tap Ollama <-> Gemini Switcher + Lock/PIN Button + Theme Toggle -->
-    <div class="flex items-center gap-1.5 sm:gap-2 ml-auto">
-      <div class="segmented-control" role="group" aria-label="Switch between Ollama and Gemini engine">
-        <button id="btn-toggle-ollama" type="button" class="segmented-option">
+    <!-- Right: Compact Local <-> Cloud Engine Toggle + Actions -->
+    <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
+      <div class="segmented-control" role="group" aria-label="Switch between Local Ollama and Cloud AI">
+        <button id="btn-toggle-ollama" type="button" class="segmented-option !px-2 sm:!px-3 !text-[11px]">
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-          <span>Ollama</span>
+          <span>Local</span>
         </button>
-        <button id="btn-toggle-gemini" type="button" class="segmented-option is-active">
+        <button id="btn-toggle-cloud" type="button" class="segmented-option is-active !px-2 sm:!px-3 !text-[11px]">
           <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-          <span>Gemini</span>
+          <span>Cloud</span>
         </button>
       </div>
 
-      <!-- Active Agent Profile Modal Trigger -->
-      <button id="btn-open-new-agent" type="button" title="Create New Agent Profile"
-        class="pro-pill w-8 h-8 rounded-full flex items-center justify-center text-secondary hover:opacity-80 transition shrink-0">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <button id="btn-open-new-agent" type="button" title="New Agent Profile"
+        class="hidden sm:flex pro-pill w-7 h-7 rounded-full items-center justify-center text-secondary hover:opacity-80 transition shrink-0">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
         </svg>
       </button>
 
-      <!-- Access PIN / Unlock Button -->
       <button id="btn-open-pin-modal" type="button" title="Workspace Access PIN"
-        class="pro-pill w-8 h-8 rounded-full flex items-center justify-center text-secondary hover:opacity-80 transition shrink-0">
+        class="pro-pill w-7 h-7 rounded-full flex items-center justify-center text-secondary hover:opacity-80 transition shrink-0">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
         </svg>
       </button>
 
-      <!-- Light / Dark / System Theme Toggle -->
       <button id="btn-theme-toggle" type="button" title="Toggle Light / Dark / Device Theme" aria-label="Toggle color theme"
-        class="pro-pill w-8 h-8 rounded-full flex items-center justify-center text-secondary hover:opacity-80 transition shrink-0">
-        <svg id="theme-toggle-svg" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        class="pro-pill w-7 h-7 rounded-full flex items-center justify-center text-secondary hover:opacity-80 transition shrink-0">
+        <svg id="theme-toggle-svg" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
         </svg>
       </button>
@@ -199,8 +185,7 @@
       <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping shrink-0"></span>
       <span id="approval-banner-text" class="text-xs font-medium text-primary truncate">Agent waiting for tool approval...</span>
     </div>
-    <button id="btn-review-approval" type="button"
-      class="shrink-0 btn-primary-pro text-xs px-3 py-1 rounded-full">
+    <button id="btn-review-approval" type="button" class="shrink-0 btn-primary-pro text-xs px-3 py-1 rounded-full">
       Review Gate
     </button>
   </div>
@@ -210,11 +195,11 @@
   <!-- ===================================================================== -->
   <div class="flex-1 flex overflow-hidden">
 
-    <!-- LEFT SIDEBAR NAVIGATION (Like VS Code / Cursor / Antigravity IDE) -->
-    <aside class="shrink-0 bg-elevated border-r pro-border w-14 sm:w-44 flex flex-col justify-between py-3 px-1.5 sm:px-2.5 z-10">
+    <!-- LEFT SIDEBAR NAVIGATION -->
+    <aside class="shrink-0 bg-elevated border-r pro-border w-12 sm:w-44 flex flex-col justify-between py-2.5 px-1 sm:px-2.5 z-10">
       <div class="space-y-1">
         <button type="button" data-tab="chat"
-          class="nav-tab-btn w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-primary bg-zinc-500/10 font-semibold text-xs transition">
+          class="nav-tab-btn w-full flex items-center gap-2.5 px-2 sm:px-2.5 py-2.5 rounded-xl text-primary bg-zinc-500/10 font-semibold text-xs transition">
           <svg class="w-4 h-4 shrink-0 mx-auto sm:mx-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
@@ -222,7 +207,7 @@
         </button>
 
         <button type="button" data-tab="files"
-          class="nav-tab-btn w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-secondary hover:text-primary text-xs transition">
+          class="nav-tab-btn w-full flex items-center gap-2.5 px-2 sm:px-2.5 py-2.5 rounded-xl text-secondary hover:text-primary text-xs transition">
           <svg class="w-4 h-4 shrink-0 mx-auto sm:mx-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
           </svg>
@@ -230,7 +215,7 @@
         </button>
 
         <button type="button" data-tab="github"
-          class="nav-tab-btn w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-secondary hover:text-primary text-xs transition">
+          class="nav-tab-btn w-full flex items-center gap-2.5 px-2 sm:px-2.5 py-2.5 rounded-xl text-secondary hover:text-primary text-xs transition">
           <svg class="w-4 h-4 shrink-0 mx-auto sm:mx-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
           </svg>
@@ -238,7 +223,7 @@
         </button>
 
         <button type="button" data-tab="git"
-          class="nav-tab-btn w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-secondary hover:text-primary text-xs transition">
+          class="nav-tab-btn w-full flex items-center gap-2.5 px-2 sm:px-2.5 py-2.5 rounded-xl text-secondary hover:text-primary text-xs transition">
           <svg class="w-4 h-4 shrink-0 mx-auto sm:mx-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2" />
           </svg>
@@ -246,7 +231,7 @@
         </button>
 
         <button type="button" data-tab="agents"
-          class="nav-tab-btn w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-secondary hover:text-primary text-xs transition">
+          class="nav-tab-btn w-full flex items-center gap-2.5 px-2 sm:px-2.5 py-2.5 rounded-xl text-secondary hover:text-primary text-xs transition">
           <svg class="w-4 h-4 shrink-0 mx-auto sm:mx-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
           </svg>
@@ -254,7 +239,7 @@
         </button>
 
         <button type="button" data-tab="docs"
-          class="nav-tab-btn w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-secondary hover:text-primary text-xs transition">
+          class="nav-tab-btn w-full flex items-center gap-2.5 px-2 sm:px-2.5 py-2.5 rounded-xl text-secondary hover:text-primary text-xs transition">
           <svg class="w-4 h-4 shrink-0 mx-auto sm:mx-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
           </svg>
@@ -262,7 +247,6 @@
         </button>
       </div>
 
-      <!-- Bottom Status Pill inside Sidebar -->
       <div class="hidden sm:block pt-3 border-t pro-border space-y-1.5 px-1">
         <div class="text-[10px] font-semibold uppercase tracking-wider text-tertiary">Active Agent</div>
         <select id="active-agent-select" aria-label="Select Active Agent Profile"
@@ -272,7 +256,7 @@
       </div>
     </aside>
 
-    <!-- MAIN CONTENT WORKSPACE (min-w-0 prevents flex items from overflowing right on mobile!) -->
+    <!-- MAIN CONTENT WORKSPACE -->
     <main class="flex-1 min-w-0 overflow-hidden relative flex flex-col bg-canvas">
 
       <!-- DRAG-DOWN PULL-TO-REFRESH INDICATOR BAR -->
@@ -283,53 +267,49 @@
         <span id="ptr-text">Pull down to refresh...</span>
       </div>
 
-      <!-- VIEW 1: CONVERSATION CANVAS (ChatGPT / Claude / Gemini Style) -->
+      <!-- VIEW 1: CONVERSATION CANVAS -->
       <section id="view-chat" class="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
         <div id="chat-messages" class="flex-1 overflow-y-auto px-3.5 sm:px-8 py-5 select-text">
           <div class="max-w-3xl mx-auto space-y-5" id="chat-thread">
-            <!-- Empty-State Hero -->
             <div id="chat-empty-state" class="py-6 sm:py-12 text-center space-y-4">
               <div class="inline-flex flex-wrap items-center justify-center gap-1.5 px-3 py-1.5 rounded-2xl pro-pill text-xs text-secondary max-w-full">
-                <img src="/static/ownstack-logo.jpeg" alt="OwnStack" class="w-4 h-4 rounded-md object-cover shrink-0" />
-                <span id="chat-agent-provider-badge" class="font-semibold text-primary">GEMINI</span>
+                <img src="/static/ownstack-logo.jpeg" alt="OwnStack IDE" class="w-4 h-4 rounded-md object-cover shrink-0" />
+                <span id="chat-agent-provider-badge" class="font-semibold text-primary">CLOUD AI</span>
                 <span>•</span>
                 <span id="chat-agent-role" class="truncate max-w-[160px] sm:max-w-none">Multi-Agent Coordinator</span>
-                <span>•</span>
-                <span id="chat-subagent-count" class="text-indigo-600 font-medium">3 Gates</span>
               </div>
               <h2 class="text-2xl sm:text-3xl font-semibold tracking-tight text-primary px-2">
                 What should we build or ship today?
               </h2>
 
-              <!-- Prompt Starter Cards -->
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left pt-2">
-                <button type="button" data-quick-prompt="Run pytest and check git status (Test Mobile Approval Gate)"
-                  class="quick-prompt-btn pro-card rounded-2xl p-4 hover:border-indigo-500 transition space-y-1">
-                  <div class="text-xs font-semibold text-primary">Test Approval Gate</div>
-                  <div class="text-[11px] text-secondary leading-snug">Trigger a live tool permission check</div>
+                <button type="button" data-quick-prompt="Show the last commit with changed files and code diff"
+                  class="quick-prompt-btn pro-card rounded-2xl p-4 hover:border-emerald-500 transition space-y-1">
+                  <div class="text-xs font-semibold text-primary">Inspect Last Commit</div>
+                  <div class="text-[11px] text-secondary leading-snug">View commit hash, changed files, and code diff</div>
                 </button>
-                <button type="button" data-quick-prompt="Edit mobile_notes.md and add a training roadmap for my new Ollama PC"
-                  class="quick-prompt-btn pro-card rounded-2xl p-4 hover:border-indigo-500 transition space-y-1">
-                  <div class="text-xs font-semibold text-primary">Edit File &amp; Diff</div>
-                  <div class="text-[11px] text-secondary leading-snug">Propose a file edit and inspect unified diff</div>
+                <button type="button" data-quick-prompt="Review the codebase architecture and suggest improvements"
+                  class="quick-prompt-btn pro-card rounded-2xl p-4 hover:border-emerald-500 transition space-y-1">
+                  <div class="text-xs font-semibold text-primary">Codebase Audit</div>
+                  <div class="text-[11px] text-secondary leading-snug">Analyze structure, files, and code quality</div>
                 </button>
-                <button type="button" data-quick-prompt="Delegate to code_researcher subagent to review the backend architecture"
-                  class="quick-prompt-btn pro-card rounded-2xl p-4 hover:border-indigo-500 transition space-y-1">
-                  <div class="text-xs font-semibold text-primary">Subagent Audit</div>
-                  <div class="text-[11px] text-secondary leading-snug">Delegate codebase review to subagents</div>
+                <button type="button" data-quick-prompt="Check git status and summarize any pending changes"
+                  class="quick-prompt-btn pro-card rounded-2xl p-4 hover:border-emerald-500 transition space-y-1">
+                  <div class="text-xs font-semibold text-primary">Workspace Status</div>
+                  <div class="text-[11px] text-secondary leading-snug">Inspect current branch and modified files</div>
                 </button>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Floating Pill Composer Bar (Enter sends, Shift+Enter newline) -->
+        <!-- Floating Pill Composer Bar (Send Button Inactive Until Text Is Entered!) -->
         <div class="shrink-0 px-3 sm:px-6 pb-4 pt-1 bg-canvas">
           <form id="chat-form" class="max-w-3xl mx-auto floating-composer px-4 py-2.5 flex items-end gap-2">
-            <textarea id="chat-input" rows="1" placeholder="Message active agent... (Press Enter to send, Shift+Enter for new line)"
+            <textarea id="chat-input" rows="1" placeholder="Ask OwnStack IDE..."
               class="flex-1 bg-transparent text-primary placeholder-zinc-400 text-sm py-1 px-1 focus:outline-none resize-none max-h-36"></textarea>
-            <button type="submit" id="btn-send-chat" aria-label="Send message"
-              class="w-8 h-8 rounded-full btn-primary-pro flex items-center justify-center shrink-0 mb-0.5">
+            <button type="submit" id="btn-send-chat" disabled aria-label="Send message"
+              class="w-8 h-8 rounded-full btn-primary-pro flex items-center justify-center shrink-0 mb-0.5 opacity-35 cursor-not-allowed transition">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7" />
               </svg>
@@ -338,47 +318,56 @@
         </div>
       </section>
 
-      <!-- VIEW 2: FILE TREE EXPLORER & CODE / DIFF VIEWER (Responsive Split-Screen on PC, Stack on Mobile) -->
+      <!-- VIEW 2: FILE TREE EXPLORER, SYNTAX CODE VIEWER & IMAGE PREVIEWER -->
       <section id="view-files" class="hidden flex-1 min-w-0 flex flex-col h-full overflow-hidden">
-        <div class="bg-canvas border-b pro-border px-4 py-2.5 flex items-center justify-between gap-2">
+        <!-- Clean Two-Row/Wrap Sub-header so buttons never squish on mobile -->
+        <div class="bg-canvas border-b pro-border px-3 py-2 flex flex-wrap items-center justify-between gap-2">
           <div class="flex items-center gap-2 min-w-0">
-            <button id="btn-back-to-tree" type="button" class="lg:hidden hidden text-xs pro-pill font-medium px-3 py-1 rounded-full">
+            <button id="btn-back-to-tree" type="button" class="lg:hidden hidden text-xs pro-pill font-medium px-2.5 py-1 rounded-full shrink-0 whitespace-nowrap">
               ← Files
             </button>
-            <span id="current-file-label" class="text-xs font-mono font-semibold text-primary truncate">Workspace Explorer</span>
+            <span id="current-file-label" class="text-xs font-mono font-semibold text-primary truncate">Explorer</span>
           </div>
-          <div class="flex items-center gap-1.5">
-            <button id="btn-toggle-edit-mode" type="button" class="hidden text-xs pro-pill font-semibold px-3 py-1 rounded-full">
-              Edit File
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button id="btn-toggle-edit-mode" type="button" class="hidden text-xs pro-pill font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">
+              Edit
             </button>
-            <button id="btn-toggle-file-diff" type="button" class="hidden text-xs pro-pill font-semibold px-3 py-1 rounded-full">
-              View Diff
+            <button id="btn-toggle-file-diff" type="button" class="hidden text-xs pro-pill font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">
+              Diff
             </button>
-            <button id="btn-save-file" type="button" class="hidden text-xs btn-primary-pro px-3.5 py-1 rounded-full">
-              Save File
+            <button id="btn-save-file" type="button" class="hidden text-xs btn-primary-pro px-3 py-1 rounded-full whitespace-nowrap">
+              Save
             </button>
-            <button id="btn-refresh-files" type="button" class="text-xs pro-pill font-medium px-3 py-1 rounded-full">
+            <button id="btn-refresh-files" type="button" class="text-xs pro-pill font-medium px-2.5 py-1 rounded-full whitespace-nowrap">
               Refresh
             </button>
           </div>
         </div>
 
-        <!-- PC Split View: File Tree on left (lg:w-72), Syntax-Highlighted Code/Diff Editor on right -->
         <div class="flex-1 flex overflow-hidden">
           <div id="file-tree-pane" class="w-full lg:w-72 lg:border-r pro-border overflow-y-auto p-3 space-y-1 shrink-0"></div>
 
           <div id="file-editor-pane" class="hidden lg:flex flex-1 min-w-0 flex-col overflow-hidden">
             <div id="code-editor-wrapper" class="flex-1 flex flex-col overflow-hidden code-surface">
-              <div class="shrink-0 px-4 py-1.5 border-b pro-border flex items-center justify-between text-[11px] font-mono text-tertiary bg-canvas">
+              <div class="shrink-0 px-3.5 py-1.5 border-b pro-border flex items-center justify-between text-[11px] font-mono text-tertiary bg-canvas">
                 <span id="editor-lang-badge">Select a file</span>
                 <span id="editor-line-count">0 lines</span>
               </div>
-              <!-- Syntax-Highlighted Read View (With Line Numbers & Multi-Color Tokens like VS Code) -->
-              <div id="file-syntax-viewer" class="flex-1 overflow-auto p-3 font-mono text-xs leading-relaxed select-text">
-                <div class="text-tertiary text-xs p-2">Select a file from the explorer to inspect syntax-highlighted code.</div>
+
+              <!-- Image Preview Panel (Shown automatically for PNG, JPG, JPEG, WEBP, GIF, SVG) -->
+              <div id="file-image-viewer" class="hidden flex-1 overflow-auto p-6 flex flex-col items-center justify-center gap-3">
+                <img id="file-image-preview" src="" alt="Workspace Image Preview"
+                  class="max-w-full max-h-[65vh] rounded-xl border pro-border shadow-sm object-contain bg-canvas" />
+                <span id="file-image-meta" class="text-xs font-mono text-tertiary"></span>
               </div>
-              <!-- Raw Editable Textarea (Shown when user clicks "Edit File") -->
-              <textarea id="file-editor-textarea" spellcheck="false" placeholder="Select a file from the explorer to view or edit..."
+
+              <!-- Syntax-Highlighted Read View (Single Horizontal Scroll Container, No Line-Wrapping Chaos!) -->
+              <div id="file-syntax-viewer" class="flex-1 overflow-auto p-3 font-mono text-xs leading-5 select-text">
+                <div class="text-tertiary text-xs p-2">Select a file from the explorer to inspect code or preview images.</div>
+              </div>
+
+              <!-- Raw Editable Textarea -->
+              <textarea id="file-editor-textarea" spellcheck="false" placeholder="Select a file from the explorer to edit..."
                 class="hidden flex-1 w-full code-surface text-xs p-4 focus:outline-none resize-none leading-relaxed select-text"></textarea>
             </div>
             <div id="file-diff-viewer" class="hidden flex-1 overflow-y-auto pro-card m-3 rounded-2xl p-3.5 font-mono text-xs space-y-0.5 select-text"></div>
@@ -386,20 +375,19 @@
         </div>
       </section>
 
-      <!-- VIEW 3: GITHUB REPOSITORIES BROWSER (1-Click Clone & Seamless Workspace Switcher) -->
-      <section id="view-github" class="hidden flex-1 overflow-y-auto p-4 sm:p-6">
+      <!-- VIEW 3: GITHUB REPOSITORIES BROWSER -->
+      <section id="view-github" class="hidden flex-1 min-w-0 overflow-y-auto p-3.5 sm:p-6">
         <div class="max-w-4xl mx-auto space-y-5">
-          <!-- GitHub Account & Search Bar -->
           <div class="pro-card rounded-2xl p-4 space-y-3">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <div class="flex items-center gap-2">
-                  <h2 class="text-sm font-semibold text-primary">GitHub Repositories &amp; Workspaces</h2>
+                <div class="flex flex-wrap items-center gap-2">
+                  <h2 class="text-sm font-semibold text-primary">GitHub Repositories</h2>
                   <span id="github-auth-badge" class="text-[10px] font-medium px-2 py-0.5 rounded-full pro-pill text-secondary">Public Only</span>
                 </div>
-                <p class="text-xs text-secondary">Click any repository to clone and switch your active IDE workspace seamlessly</p>
+                <p class="text-xs text-secondary">Click any repository to clone and switch workspaces seamlessly</p>
               </div>
-              <div class="flex items-center gap-2">
+              <div class="flex flex-wrap items-center gap-2">
                 <input id="github-username-input" type="text" value="RealRiga" placeholder="GitHub username..."
                   class="pro-input text-xs font-mono rounded-xl px-3 py-1.5 w-32 sm:w-36" />
                 <button id="btn-github-obscure" type="button" class="pro-pill text-xs font-semibold px-3 py-1.5 rounded-xl flex items-center gap-1">
@@ -411,11 +399,10 @@
               </div>
             </div>
 
-            <!-- GitHub Personal Access Token for private repos (Responsive stack on mobile) -->
             <div class="pt-2 border-t pro-border space-y-1.5">
               <div class="flex flex-wrap items-center justify-between gap-1 text-[11px]">
                 <span class="font-medium text-secondary">🔑 Unlock Private Repositories (GitHub Token)</span>
-                <a href="https://github.com/settings/tokens/new?scopes=repo&description=OwnStack-Antigravity-IDE" target="_blank" rel="noopener"
+                <a href="https://github.com/settings/tokens/new?scopes=repo&description=OwnStack-IDE" target="_blank" rel="noopener"
                   class="underline font-semibold text-indigo-600">
                   Generate 1-Click Token →
                 </a>
@@ -430,13 +417,11 @@
             </div>
           </div>
 
-          <!-- Local / Already Cloned Workspaces -->
           <div class="space-y-2">
             <h3 class="text-xs font-semibold uppercase tracking-wider text-tertiary px-1">Active &amp; Local Workspaces</h3>
             <div id="local-workspaces-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5"></div>
           </div>
 
-          <!-- GitHub Repositories Grid -->
           <div class="space-y-2">
             <h3 class="text-xs font-semibold uppercase tracking-wider text-tertiary px-1">GitHub Repositories</h3>
             <div id="github-repos-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
@@ -460,7 +445,6 @@
               </button>
             </div>
 
-            <!-- Branch Controls: Input wraps on mobile, buttons sit side-by-side below on mobile or inline on desktop -->
             <div class="flex flex-col sm:flex-row gap-2">
               <input id="git-new-branch-input" type="text" placeholder="Branch name..."
                 class="flex-1 min-w-0 pro-input text-xs rounded-xl px-3 py-2" />
@@ -515,31 +499,27 @@
       </section>
 
       <!-- VIEW 5: MULTI-AGENT ORCHESTRATOR & SETTINGS -->
-      <section id="view-agents" class="hidden flex-1 overflow-y-auto p-4 sm:p-6">
+      <section id="view-agents" class="hidden flex-1 min-w-0 overflow-y-auto p-3.5 sm:p-6">
         <div class="max-w-3xl mx-auto space-y-4">
           <div class="pro-card rounded-2xl p-4 space-y-3">
             <div class="space-y-1">
-              <h2 class="text-sm font-semibold text-primary">Agent Profiles &amp; SDK Architecture</h2>
+              <h2 class="text-sm font-semibold text-primary">OwnStack IDE Agent Profiles</h2>
               <p class="text-xs text-secondary leading-relaxed">
-                Each profile compiles directly into a Google Antigravity SDK configuration:
-                <strong>Ollama</strong> profiles use <code class="text-[11px] pro-pill px-1.5 py-0.5 rounded">LocalOpenAIAgentConfig.lightweight()</code>, while
-                <strong>Gemini</strong> profiles use <code class="text-[11px] pro-pill px-1.5 py-0.5 rounded">LocalAgentConfig</code> with autonomous subagents and tool approval hooks.
+                Create custom AI agent profiles powered by your <strong>Local Ollama</strong> server or <strong>Cloud AI</strong> API key, each with its own instructions and tool permissions.
               </p>
             </div>
-            <button id="btn-add-agent-card" type="button"
-              class="w-full btn-primary-pro text-xs py-2.5 rounded-xl">
+            <button id="btn-add-agent-card" type="button" class="w-full btn-primary-pro text-xs py-2.5 rounded-xl">
               + Create New Agent Profile
             </button>
           </div>
 
           <div class="pro-card rounded-2xl p-4 space-y-3">
-            <div class="flex items-center justify-between">
+            <div class="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h2 class="text-sm font-semibold text-primary">Engine Connections &amp; Security</h2>
-                <p class="text-xs text-secondary">Configure Ollama endpoint, Gemini API key, and access PIN</p>
+                <p class="text-xs text-secondary">Configure Ollama endpoint, Cloud AI API key, and access PIN</p>
               </div>
-              <button id="btn-test-ollama" type="button"
-                class="text-xs pro-pill font-medium px-3 py-1.5 rounded-full">
+              <button id="btn-test-ollama" type="button" class="text-xs pro-pill font-medium px-3 py-1.5 rounded-full">
                 Test Ollama
               </button>
             </div>
@@ -552,20 +532,19 @@
               </div>
               <div>
                 <label class="block text-[11px] font-medium text-secondary mb-1">
-                  Gemini API Key (<a href="https://aistudio.google.com/app/api-keys" target="_blank" rel="noopener" class="underline text-primary">Google AI Studio</a>)
+                  Cloud AI API Key
                 </label>
-                <input id="setting-gemini-key" type="password" placeholder="AIzaSy... or AQ...."
+                <input id="setting-gemini-key" type="password" placeholder="Paste your Cloud AI API key..."
                   class="w-full pro-input text-xs font-mono rounded-xl px-3 py-2" />
               </div>
               <div>
                 <label class="block text-[11px] font-medium text-secondary mb-1">
-                  Remote Access PIN (Matches <code>AGY_ACCESS_PIN</code> on Render/Cloud)
+                  Remote Access PIN (Matches <code>AGY_ACCESS_PIN</code> on server)
                 </label>
-                <input id="setting-access-pin" type="password" placeholder="Enter your AGY_ACCESS_PIN"
+                <input id="setting-access-pin" type="password" placeholder="Enter your access PIN"
                   class="w-full pro-input text-xs font-mono rounded-xl px-3 py-2" />
               </div>
-              <button id="btn-save-settings" type="button"
-                class="w-full btn-primary-pro text-xs py-2.5 rounded-xl">
+              <button id="btn-save-settings" type="button" class="w-full btn-primary-pro text-xs py-2.5 rounded-xl">
                 Save Connection Settings
               </button>
             </div>
@@ -584,8 +563,8 @@
         <div class="max-w-3xl mx-auto space-y-4">
           <div class="pro-card rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h2 class="text-base font-bold text-primary">OwnStack Antigravity IDE — Documentation</h2>
-              <p class="text-xs text-secondary">Architecture, Multi-Agent SDK configs, API key setup, and cloud deployment guide</p>
+              <h2 class="text-base font-bold text-primary">OwnStack IDE — Documentation</h2>
+              <p class="text-xs text-secondary">Architecture, Multi-Agent setup, GitHub integration, and cloud deployment guide</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
               <button type="button" id="btn-doc-tab-guide" class="btn-primary-pro text-xs px-3.5 py-1.5 rounded-full">
@@ -597,23 +576,6 @@
             </div>
           </div>
 
-          <!-- Instant API Key Fix Banner Inside Docs (break-all prevents long URLs from overflowing on mobile!) -->
-          <div class="pro-card rounded-2xl p-4 space-y-2 border-indigo-500/30 overflow-hidden">
-            <div class="text-xs font-bold text-primary">💡 Quick Tip: Google AI Studio / Gemini API Key</div>
-            <p class="text-xs text-secondary leading-relaxed break-words">
-              • Both standard <code>AIzaSy...</code> and <code>AQ....</code> keys created in
-              <a href="https://aistudio.google.com/app/api-keys" target="_blank" rel="noopener" class="underline font-semibold text-indigo-600">
-                Google AI Studio
-              </a>
-              work out of the box on the free Gemini API as long as the <strong>Gemini API (Generative Language API)</strong> is enabled on your Google Cloud project.<br/>
-              • Direct API library link:<br/>
-              <a href="https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com" target="_blank" rel="noopener" class="underline font-semibold text-indigo-600 break-all">
-                https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com
-              </a>
-            </p>
-          </div>
-
-          <!-- Rendered Markdown Documentation Content -->
           <article id="docs-content-box" class="pro-card rounded-2xl p-4 sm:p-5 text-xs sm:text-sm text-primary leading-relaxed space-y-3 font-sans overflow-x-auto break-words">
             Loading documentation...
           </article>
@@ -623,19 +585,17 @@
     </main>
   </div>
 
-  <!-- ===================================================================== -->
-  <!-- NATIVE MODAL <dialog> FOR ACCESS PIN UNLOCK (Auto-Opens on 401)       -->
-  <!-- ===================================================================== -->
+  <!-- NATIVE MODAL <dialog> FOR ACCESS PIN UNLOCK -->
   <dialog id="pin-dialog" aria-labelledby="pin-dialog-title">
     <form id="pin-dialog-form" method="dialog" class="space-y-3.5">
       <div class="flex items-center gap-2.5">
-        <img src="/static/ownstack-logo.jpeg" alt="OwnStack" class="w-7 h-7 rounded-lg object-cover" />
-        <h2 id="pin-dialog-title" class="text-sm font-semibold text-primary">Unlock OwnStack Workspace</h2>
+        <img src="/static/ownstack-logo.jpeg" alt="OwnStack IDE" class="w-7 h-7 rounded-lg object-cover" />
+        <h2 id="pin-dialog-title" class="text-sm font-semibold text-primary">Unlock OwnStack IDE</h2>
       </div>
       <p class="text-xs text-secondary leading-relaxed">
-        Enter the <code>AGY_ACCESS_PIN</code> you configured on Render (or your server's <code>.env</code>) to authenticate API and live agent WebSocket connections:
+        Enter your workspace access PIN to authenticate API and live agent connections:
       </p>
-      <input id="modal-pin-input" type="password" autofocus placeholder="Enter your AGY_ACCESS_PIN..."
+      <input id="modal-pin-input" type="password" autofocus placeholder="Enter access PIN..."
         class="w-full pro-input text-xs font-mono rounded-xl px-3.5 py-2.5" />
       <div class="flex justify-end gap-2 pt-1">
         <button type="button" id="btn-cancel-pin" class="pro-pill text-xs font-semibold px-4 py-2 rounded-xl">
@@ -658,19 +618,17 @@
         </span>
       </div>
       <p class="text-xs text-secondary">
-        Agent <strong id="approval-agent-name" class="text-primary">ollama-coder</strong> wants to execute:
+        Agent <strong id="approval-agent-name" class="text-primary">ownstack-ai</strong> wants to execute:
       </p>
       <div class="bg-elevated border pro-border rounded-xl p-3 space-y-1.5">
         <div class="text-xs font-mono font-semibold text-indigo-600" id="approval-tool-name">run_command</div>
         <pre id="approval-tool-args" class="text-[11px] font-mono code-surface border pro-border rounded-lg p-2.5 whitespace-pre-wrap break-all max-h-40 overflow-y-auto"></pre>
       </div>
       <form method="dialog" class="flex items-center justify-end gap-2 pt-1">
-        <button type="submit" value="reject" autofocus
-          class="pro-pill text-xs font-semibold px-4 py-2 rounded-xl">
+        <button type="submit" value="reject" autofocus class="pro-pill text-xs font-semibold px-4 py-2 rounded-xl">
           Deny
         </button>
-        <button type="submit" value="approve"
-          class="btn-primary-pro text-xs px-4 py-2 rounded-xl">
+        <button type="submit" value="approve" class="btn-primary-pro text-xs px-4 py-2 rounded-xl">
           Approve &amp; Run
         </button>
       </form>
@@ -682,27 +640,26 @@
     <form id="new-agent-form" method="dialog" class="space-y-3.5">
       <div class="flex items-center justify-between">
         <h2 id="new-agent-dialog-title" class="text-sm font-semibold text-primary">New Agent Profile</h2>
-        <span class="text-[10px] font-medium px-2 py-0.5 rounded-full pro-pill text-secondary">Antigravity SDK</span>
+        <span class="text-[10px] font-medium px-2 py-0.5 rounded-full pro-pill text-secondary">OwnStack IDE</span>
       </div>
       <div class="space-y-2.5">
         <div>
           <label class="block text-[11px] font-medium text-secondary mb-1">Display Name</label>
-          <input id="new-agent-name" type="text" required placeholder="e.g., My Custom Trained Ollama Model"
+          <input id="new-agent-name" type="text" required placeholder="e.g., My Custom Trained Model"
             class="w-full pro-input text-xs rounded-xl px-3 py-2" />
         </div>
         <div class="grid grid-cols-2 gap-2">
           <div>
             <label class="block text-[11px] font-medium text-secondary mb-1">Engine</label>
-            <select id="new-agent-provider"
-              class="w-full pro-input text-xs font-medium rounded-xl px-3 py-2">
-              <option value="ollama">Ollama (LocalOpenAI)</option>
-              <option value="gemini">Gemini (+Subagents)</option>
-              <option value="litert">LiteRT On-Device</option>
+            <select id="new-agent-provider" class="w-full pro-input text-xs font-medium rounded-xl px-3 py-2">
+              <option value="ollama">Local AI (Ollama)</option>
+              <option value="cloud">Cloud AI (+Subagents)</option>
+              <option value="litert">On-Device AI</option>
             </select>
           </div>
           <div>
             <label class="block text-[11px] font-medium text-secondary mb-1">Model Identifier</label>
-            <input id="new-agent-model" type="text" value="gemma4:26b" placeholder="gemma4:26b or blank"
+            <input id="new-agent-model" type="text" value="gemma4:26b" placeholder="e.g., gemma4:26b"
               class="w-full pro-input text-xs font-mono rounded-xl px-3 py-2" />
           </div>
         </div>
@@ -713,26 +670,23 @@
         </div>
         <div>
           <label class="block text-[11px] font-medium text-secondary mb-1">System Instructions</label>
-          <textarea id="new-agent-instructions" rows="2"
-            placeholder="You are a senior software engineer specialized in my codebase..."
+          <textarea id="new-agent-instructions" rows="2" placeholder="You are a senior software engineer..."
             class="w-full pro-input text-xs rounded-xl px-3 py-2"></textarea>
         </div>
         <div class="flex items-center gap-4 pt-1">
           <label class="flex items-center gap-1.5 text-xs text-primary font-medium">
-            <input id="new-agent-gate-cmd" type="checkbox" checked /> Gate <code>run_command</code>
+            <input id="new-agent-gate-cmd" type="checkbox" /> Gate <code>run_command</code>
           </label>
           <label class="flex items-center gap-1.5 text-xs text-primary font-medium">
-            <input id="new-agent-gate-edit" type="checkbox" checked /> Gate <code>edit_file</code>
+            <input id="new-agent-gate-edit" type="checkbox" /> Gate <code>edit_file</code>
           </label>
         </div>
       </div>
       <div class="flex justify-end gap-2 pt-1">
-        <button type="button" id="btn-cancel-new-agent" autofocus
-          class="pro-pill text-xs font-semibold px-4 py-2 rounded-xl">
+        <button type="button" id="btn-cancel-new-agent" autofocus class="pro-pill text-xs font-semibold px-4 py-2 rounded-xl">
           Cancel
         </button>
-        <button type="submit" value="create"
-          class="btn-primary-pro text-xs px-4 py-2 rounded-xl">
+        <button type="submit" value="create" class="btn-primary-pro text-xs px-4 py-2 rounded-xl">
           Create Profile
         </button>
       </div>
