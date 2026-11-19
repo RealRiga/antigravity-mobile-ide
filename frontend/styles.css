@@ -270,6 +270,52 @@ dialog::backdrop {
   backdrop-filter: blur(6px);
 }
 
+/* OwnStack Brand Thinking Text (White in Dark Mode, OwnStack Emerald #10b981 in Light Mode) */
+.thinking-label {
+  color: #10b981;
+  font-weight: 600;
+}
+@media (prefers-color-scheme: dark) {
+  .thinking-label {
+    color: #ffffff;
+  }
+}
+:root:has(> head > meta[name="color-scheme"][content="dark"]) .thinking-label {
+  color: #ffffff;
+}
+:root:has(> head > meta[name="color-scheme"][content="light"]) .thinking-label {
+  color: #10b981;
+}
+
+/* IDE Syntax Highlighting Colors (Keywords, Strings, Comments, Functions, Numbers) */
+.tok-kw { color: #7c3aed; font-weight: 600; }
+.tok-str { color: #059669; }
+.tok-com { color: #94a3b8; font-style: italic; }
+.tok-num { color: #d97706; }
+.tok-fn { color: #2563eb; }
+
+@media (prefers-color-scheme: dark) {
+  .tok-kw { color: #c084fc; }
+  .tok-str { color: #34d399; }
+  .tok-com { color: #64748b; }
+  .tok-num { color: #fbbf24; }
+  .tok-fn { color: #60a5fa; }
+}
+:root:has(> head > meta[name="color-scheme"][content="dark"]) {
+  & .tok-kw { color: #c084fc; }
+  & .tok-str { color: #34d399; }
+  & .tok-com { color: #64748b; }
+  & .tok-num { color: #fbbf24; }
+  & .tok-fn { color: #60a5fa; }
+}
+:root:has(> head > meta[name="color-scheme"][content="light"]) {
+  & .tok-kw { color: #7c3aed; }
+  & .tok-str { color: #059669; }
+  & .tok-com { color: #94a3b8; }
+  & .tok-num { color: #d97706; }
+  & .tok-fn { color: #2563eb; }
+}
+
 /* Diff Highlighting */
 .diff-add {
   background-color: rgba(16, 185, 129, 0.12);

@@ -503,15 +503,58 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-function formatSimpleMarkdown(text) {
-  let safe = escapeHtml(text);
-  safe = safe.replace(/\*\*(.+?)\*\*/g, "<strong class='font-semibold text-primary'>$1</strong>");
-  safe = safe.replace(
-    /`([^`]+)`/g,
-    "<code class='pro-pill px-1.5 py-0.5 rounded-md text-[11px] font-mono'>$1</code>"
+function highlightCodeLine(line) {
+  let s = escapeHtml(line);
+  // Comments (# or //)
+  if (/^\s*(#|\/\/)/.test(s)) {
+    return `<span class="tok-com">${s}</span>`;
+  }
+  // Strings
+  s = s.replace(/(&quot;.*?&quot;|&#39;.*?&#39;|"[^"]*"|'[^']*')/g, '<span class="tok-str">$1</span>');
+  // Keywords
+  s = s.replace(
+    /\b(def|class|async|await|return|import|from|if|elif|else|for|while|try|except|finally|with|as|const|let|var|function|export|default|true|false|null|None|True|False|in|not|and|or)\b/g,
+    '<span class="tok-kw">$1</span>'
   );
-  safe = safe.replace(/\n/g, "<br/>");
-  return safe;
+  // Numbers
+  s = s.replace(/\b(\d+(\.\d+)?)\b/g, '<span class="tok-num">$1</span>');
+  return s;
+}
+
+function formatSimpleMarkdown(text) {
+  // Handle fenced code blocks ```lang ... ``` first with syntax coloring!
+  const segments = text.split(/(```[\s\S]*?```)/g);
+  return segments
+    .map((seg) => {
+      if (seg.startsWith("```") && seg.endsWith("```")) {
+        const inner = seg.slice(3, -3).replace(/^[a-zA-Z0-9_-]+\n/, "");
+        const highlighted = inner
+          .split("\n")
+          .map((l) => {
+            if (l.startsWith("+") && !l.startsWith("+++")) {
+              return `<div class="diff-add px-2 rounded">${escapeHtml(l)}</div>`;
+            }
+            if (l.startsWith("-") && !l.startsWith("---")) {
+              return `<div class="diff-del px-2 rounded">${escapeHtml(l)}</div>`;
+            }
+            if (l.startsWith("@@")) {
+              return `<div class="diff-hunk px-2 rounded">${escapeHtml(l)}</div>`;
+            }
+            return `<div>${highlightCodeLine(l)}</div>`;
+          })
+          .join("");
+        return `<pre class="code-surface border pro-border rounded-xl p-3 my-2 font-mono text-xs overflow-x-auto leading-relaxed">${highlighted}</pre>`;
+      }
+      let safe = escapeHtml(seg);
+      safe = safe.replace(/\*\*(.+?)\*\*/g, "<strong class='font-semibold text-primary'>$1</strong>");
+      safe = safe.replace(
+        /`([^`]+)`/g,
+        "<code class='pro-pill px-1.5 py-0.5 rounded-md text-[11px] font-mono'>$1</code>"
+      );
+      safe = safe.replace(/\n/g, "<br/>");
+      return safe;
+    })
+    .join("");
 }
 
 function handleStreamEvent(msg) {
@@ -519,24 +562,14 @@ function handleStreamEvent(msg) {
     setGeneratingState(true);
     if (chatEmptyState) chatEmptyState.classList.add("hidden");
     const card = document.createElement("div");
-    card.className = "space-y-2.5 py-2";
-    const isOllama = msg.provider === "ollama";
+    card.className = "space-y-2 py-2";
     card.innerHTML = `
-      <div class="flex items-center gap-2 text-xs">
-        <img src="/static/ownstack-logo.jpeg" alt="OwnStack" class="w-5 h-5 rounded-md object-cover border pro-border" />
-        <span class="font-semibold text-primary">${escapeHtml(msg.agent_name)}</span>
-        <span class="font-mono text-tertiary text-[11px]">${escapeHtml(msg.model)}</span>
-        <span class="turn-running-pill inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 text-[10px] font-medium">
-          <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping"></span>
-          <span>Thinking...</span>
-        </span>
+      <div class="flex items-center gap-2.5 text-xs">
+        <img src="/static/ownstack-logo.jpeg" alt="OwnStack" class="w-6 h-6 rounded-lg object-cover border pro-border shadow-sm shrink-0" />
+        <span class="turn-running-pill thinking-label text-xs tracking-tight animate-pulse">Thinking...</span>
       </div>
-      <div class="pl-7 space-y-2.5">
-        <details class="thought-box hidden bg-elevated border pro-border rounded-xl px-3 py-2 text-[11px] text-secondary">
-          <summary class="cursor-pointer font-medium text-secondary select-none">Thinking &amp; Subagent Trace</summary>
-          <div class="thought-content font-mono whitespace-pre-wrap pt-1.5 text-tertiary"></div>
-        </details>
-        <div class="tool-list space-y-1.5"></div>
+      <div class="pl-8 space-y-2">
+        <div class="tool-status-line hidden text-[11px] font-mono text-tertiary"></div>
         <div class="response-content text-sm text-primary leading-relaxed"></div>
       </div>
     `;
@@ -545,29 +578,26 @@ function handleStreamEvent(msg) {
       el: card,
       rawText: "",
       runningPill: card.querySelector(".turn-running-pill"),
-      thoughtBox: card.querySelector(".thought-box"),
-      thoughtContent: card.querySelector(".thought-content"),
-      toolList: card.querySelector(".tool-list"),
+      toolStatusLine: card.querySelector(".tool-status-line"),
       responseContent: card.querySelector(".response-content"),
     };
     chatMessages.scrollTop = chatMessages.scrollHeight;
   } else if (msg.type === "thought_delta" && state.activeTurnCard) {
-    state.activeTurnCard.thoughtBox.classList.remove("hidden");
-    state.activeTurnCard.thoughtContent.textContent += msg.delta;
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    // Keep UI minimal during thinking: just logo + Thinking... label
   } else if (msg.type === "tool_start" && state.activeTurnCard) {
-    const badge = document.createElement("div");
-    badge.className =
-      "bg-elevated border pro-border rounded-xl px-3 py-2 text-[11px] font-mono flex items-center justify-between gap-2";
-    badge.innerHTML = `
-      <div class="truncate">
-        <span class="text-primary font-semibold">${escapeHtml(msg.tool_name)}</span>
-        <span class="text-tertiary ml-1.5">${escapeHtml(JSON.stringify(msg.arguments))}</span>
-      </div>
-      <span class="text-amber-600 font-medium text-[10px] shrink-0">Executing</span>
-    `;
-    state.activeTurnCard.toolList.appendChild(badge);
+    if (state.activeTurnCard.toolStatusLine) {
+      const cmd =
+        msg.arguments && (msg.arguments.CommandLine || msg.arguments.Path)
+          ? `: ${msg.arguments.CommandLine || msg.arguments.Path}`
+          : "";
+      state.activeTurnCard.toolStatusLine.classList.remove("hidden");
+      state.activeTurnCard.toolStatusLine.textContent = `⚡ ${msg.tool_name}${cmd}`;
+    }
     chatMessages.scrollTop = chatMessages.scrollHeight;
+  } else if (msg.type === "tool_end" && state.activeTurnCard) {
+    if (state.activeTurnCard.toolStatusLine) {
+      state.activeTurnCard.toolStatusLine.classList.add("hidden");
+    }
   } else if (msg.type === "approval_required") {
     state.currentApprovalId = msg.approval_id;
     approvalAgentName.textContent = msg.agent_id;
@@ -584,12 +614,19 @@ function handleStreamEvent(msg) {
       approvalDialog.close();
     }
   } else if (msg.type === "token_delta" && state.activeTurnCard) {
+    if (state.activeTurnCard.runningPill) {
+      state.activeTurnCard.runningPill.classList.remove("animate-pulse");
+      state.activeTurnCard.runningPill.textContent = "";
+    }
     state.activeTurnCard.rawText += msg.delta;
     state.activeTurnCard.responseContent.innerHTML = formatSimpleMarkdown(state.activeTurnCard.rawText);
     chatMessages.scrollTop = chatMessages.scrollHeight;
   } else if (msg.type === "turn_end") {
     if (state.activeTurnCard && state.activeTurnCard.runningPill) {
       state.activeTurnCard.runningPill.remove();
+    }
+    if (state.activeTurnCard && state.activeTurnCard.toolStatusLine) {
+      state.activeTurnCard.toolStatusLine.classList.add("hidden");
     }
     state.activeTurnCard = null;
     setGeneratingState(false);
@@ -1006,6 +1043,21 @@ function detectLanguageLabel(filepath) {
   return map[ext] || "Code / Text";
 }
 
+function renderSyntaxHighlightedFile(content) {
+  const viewer = document.getElementById("file-syntax-viewer");
+  if (!viewer) return;
+  const lines = (content || "").split("\n");
+  viewer.innerHTML = lines
+    .map(
+      (line, idx) => `
+      <div class="flex items-baseline gap-3 px-1 hover:bg-zinc-500/5 rounded">
+        <span class="w-8 shrink-0 text-right text-[10px] text-tertiary select-none">${idx + 1}</span>
+        <span class="flex-1 whitespace-pre overflow-x-auto">${highlightCodeLine(line) || "&nbsp;"}</span>
+      </div>`
+    )
+    .join("");
+}
+
 async function openFileInEditor(path) {
   const res = await fetch(`/api/files/read?path=${encodeURIComponent(path)}`);
   if (!res.ok) return;
@@ -1013,6 +1065,7 @@ async function openFileInEditor(path) {
   state.currentFilePath = data.path;
   state.currentFileDiff = data.diff || "";
   state.showingDiff = false;
+  state.editingFile = false;
 
   document.getElementById("current-file-label").textContent = data.path;
   const langBadge = document.getElementById("editor-lang-badge");
@@ -1028,17 +1081,55 @@ async function openFileInEditor(path) {
   editorPane.classList.add("flex");
 
   document.getElementById("btn-back-to-tree").classList.remove("hidden");
-  document.getElementById("btn-save-file").classList.remove("hidden");
+  document.getElementById("btn-save-file").classList.add("hidden");
+  const btnEditMode = document.getElementById("btn-toggle-edit-mode");
+  if (btnEditMode) {
+    btnEditMode.classList.remove("hidden");
+    btnEditMode.textContent = "Edit File";
+  }
   document.getElementById("btn-toggle-file-diff").classList.remove("hidden");
   document.getElementById("btn-toggle-file-diff").textContent = "View Diff";
 
   const wrapper = document.getElementById("code-editor-wrapper");
+  const syntaxViewer = document.getElementById("file-syntax-viewer");
   const textarea = document.getElementById("file-editor-textarea");
   const diffViewer = document.getElementById("file-diff-viewer");
   if (wrapper) wrapper.classList.remove("hidden");
-  textarea.classList.remove("hidden");
+  if (syntaxViewer) syntaxViewer.classList.remove("hidden");
+  textarea.classList.add("hidden");
   diffViewer.classList.add("hidden");
   textarea.value = data.content;
+  renderSyntaxHighlightedFile(data.content);
+}
+
+const btnToggleEditMode = document.getElementById("btn-toggle-edit-mode");
+if (btnToggleEditMode) {
+  btnToggleEditMode.addEventListener("click", () => {
+    state.editingFile = !state.editingFile;
+    const syntaxViewer = document.getElementById("file-syntax-viewer");
+    const textarea = document.getElementById("file-editor-textarea");
+    const diffViewer = document.getElementById("file-diff-viewer");
+    const saveBtn = document.getElementById("btn-save-file");
+    const wrapper = document.getElementById("code-editor-wrapper");
+    if (wrapper) wrapper.classList.remove("hidden");
+    diffViewer.classList.add("hidden");
+    state.showingDiff = false;
+    document.getElementById("btn-toggle-file-diff").textContent = "View Diff";
+
+    if (state.editingFile) {
+      if (syntaxViewer) syntaxViewer.classList.add("hidden");
+      textarea.classList.remove("hidden");
+      saveBtn.classList.remove("hidden");
+      btnToggleEditMode.textContent = "Syntax View";
+      textarea.focus();
+    } else {
+      renderSyntaxHighlightedFile(textarea.value);
+      if (syntaxViewer) syntaxViewer.classList.remove("hidden");
+      textarea.classList.add("hidden");
+      saveBtn.classList.add("hidden");
+      btnToggleEditMode.textContent = "Edit File";
+    }
+  });
 }
 
 document.getElementById("btn-back-to-tree").addEventListener("click", () => {
@@ -1061,6 +1152,7 @@ document.getElementById("btn-save-file").addEventListener("click", async () => {
   });
   const data = await res.json();
   state.currentFileDiff = data.diff || "";
+  renderSyntaxHighlightedFile(content);
   const btn = document.getElementById("btn-save-file");
   btn.textContent = "Saved ✓";
   setTimeout(() => (btn.textContent = "Save File"), 1400);

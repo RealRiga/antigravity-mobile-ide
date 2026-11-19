@@ -55,9 +55,7 @@ class AgentProfile:
     model: str  # e.g., "gemma4:26b", "qwen2.5-coder:14b", or "" (default for Gemini)
     base_url: str = "http://localhost:11434/v1"
     system_instructions: str = ""
-    require_approval_for: List[str] = field(
-        default_factory=lambda: ["run_command", "edit_file", "create_file"]
-    )
+    require_approval_for: List[str] = field(default_factory=list)
     enable_subagents: bool = True
     max_subagent_depth: int = 2
     subagents: List[SubagentSpec] = field(default_factory=list)
@@ -119,11 +117,11 @@ class MultiAgentOrchestrator:
                 model="gemma4:26b",
                 base_url=f"{self.ollama_base_url.rstrip('/')}/v1",
                 system_instructions=(
-                    "You are an expert mobile-controlled coding agent running on Ollama via "
-                    "Google Antigravity SDK's LocalOpenAIAgentConfig. Write clean, modular code "
-                    "and explain file changes concisely for a mobile screen."
+                    "You are an expert coding agent inside OwnStack Antigravity IDE. "
+                    "When asked about commits, diffs, or code changes, ALWAYS inspect and include "
+                    "the actual code diff (`git show` or `git diff`), modified files, and clear code blocks."
                 ),
-                require_approval_for=["run_command", "edit_file", "create_file"],
+                require_approval_for=[],
                 enable_subagents=False,
                 use_lightweight=True,
             ),
@@ -138,7 +136,7 @@ class MultiAgentOrchestrator:
                     "You are the developer's custom local model running on Ollama. "
                     "Assist with refactoring, debugging, and dataset/training script preparation."
                 ),
-                require_approval_for=["run_command"],
+                require_approval_for=[],
                 enable_subagents=False,
                 use_lightweight=True,
             ),
@@ -149,11 +147,12 @@ class MultiAgentOrchestrator:
                 provider="gemini",
                 model="gemini-3.1-flash-lite",
                 system_instructions=(
-                    "You are the Lead Software Architect. You can delegate file exploration to "
-                    "your 'code_researcher' and 'test_specialist' subagents, propose clean diffs, "
-                    "and summarize architectural decisions clearly for a mobile developer."
+                    "You are the Lead Software Architect inside OwnStack Antigravity IDE. "
+                    "When asked about commits, files, or code changes, ALWAYS inspect and display "
+                    "the actual changed files, commit stats, and code diff blocks (`git show --stat -p -1`) "
+                    "formatted cleanly in fenced markdown code blocks."
                 ),
-                require_approval_for=["run_command", "edit_file", "create_file"],
+                require_approval_for=[],
                 enable_subagents=True,
                 max_subagent_depth=3,
                 subagents=default_subagents,
@@ -168,7 +167,7 @@ class MultiAgentOrchestrator:
                 system_instructions=(
                     "You run 100% locally via Google LiteRT-LM with zero cloud dependency."
                 ),
-                require_approval_for=["run_command"],
+                require_approval_for=[],
                 enable_subagents=False,
                 use_lightweight=True,
             ),
@@ -343,9 +342,7 @@ class MultiAgentOrchestrator:
                     "arguments": t_args,
                 }
             )
-            if t_name in profile.require_approval_for:
-                allowed = await self.request_mobile_approval(profile.id, t_name, t_args, emit)
-                return types.HookResult(allow=allowed)
+            # Note: Do NOT duplicate approval request here if policy.ask_user already handles it
             return types.HookResult(allow=True)
 
         @hooks.post_tool_call
@@ -358,9 +355,18 @@ class MultiAgentOrchestrator:
                 }
             )
 
-        # Build declarative safety policies
+        # Build declarative safety policies:
+        # Only ask user confirmation if tool is in profile.require_approval_for OR is a destructive shell command (rm -rf, git push --force, etc.)
+        DESTRUCTIVE_TOKENS = ("rm -rf", "rm -r", "git reset --hard", "git push -f", "git push --force", "drop table", "mkfs")
         agent_policies = [
             policy.workspace_only([self.workspace_dir]),
+            policy.ask_user(
+                "run_command",
+                when=lambda args: any(
+                    tok in str(args.get("CommandLine", "")).lower() for tok in DESTRUCTIVE_TOKENS
+                ),
+                handler=approval_handler,
+            ),
             policy.allow_all(),
         ]
         for gated_tool in profile.require_approval_for:
