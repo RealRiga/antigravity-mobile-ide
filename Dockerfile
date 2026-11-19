@@ -20,10 +20,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Initialize git inside container workspace if not mounted
-RUN git config --global user.email "mobile@antigravity.local" && \
-    git config --global user.name "Antigravity Mobile Agent" && \
-    git config --global --add safe.directory '*'
+# Initialize git inside container workspace so git status/diff/HEAD work out of the box on Render/Cloud
+RUN git config --global user.email "mobile@ownstack.local" && \
+    git config --global user.name "OwnStack Antigravity IDE" && \
+    git config --global init.defaultBranch main && \
+    git config --global --add safe.directory '*' && \
+    if [ ! -d ".git" ]; then git init && git add -A && git commit -m "chore: initial container workspace snapshot"; fi
 
 EXPOSE 8000
 

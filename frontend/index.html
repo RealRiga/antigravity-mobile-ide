@@ -379,7 +379,10 @@
           <div class="pro-card rounded-2xl p-4 space-y-3">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h2 class="text-sm font-semibold text-primary">GitHub Repositories &amp; Workspaces</h2>
+                <div class="flex items-center gap-2">
+                  <h2 class="text-sm font-semibold text-primary">GitHub Repositories &amp; Workspaces</h2>
+                  <span id="github-auth-badge" class="text-[10px] font-medium px-2 py-0.5 rounded-full pro-pill text-secondary">Public Only</span>
+                </div>
                 <p class="text-xs text-secondary">Click any repository to clone and switch your active IDE workspace seamlessly</p>
               </div>
               <div class="flex items-center gap-2">
@@ -391,14 +394,23 @@
               </div>
             </div>
 
-            <!-- Optional GitHub Personal Access Token for private repos -->
-            <details class="text-xs text-secondary">
-              <summary class="cursor-pointer font-medium text-tertiary hover:text-primary">Optional: Add GitHub Token (for private repositories)</summary>
-              <div class="pt-2 flex gap-2">
-                <input id="github-token-input" type="password" placeholder="ghp_... (Saved locally in browser)"
-                  class="flex-1 pro-input text-xs font-mono rounded-xl px-3 py-1.5" />
+            <!-- GitHub Personal Access Token for private repos (Visible right in the card!) -->
+            <div class="pt-2 border-t pro-border space-y-1.5">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="font-medium text-secondary">🔑 Unlock Your Private Repositories (GitHub Personal Access Token)</span>
+                <a href="https://github.com/settings/tokens/new?scopes=repo&description=OwnStack-Antigravity-IDE" target="_blank" rel="noopener"
+                  class="underline font-semibold text-indigo-600">
+                  Generate 1-Click Token on GitHub →
+                </a>
               </div>
-            </details>
+              <div class="flex gap-2">
+                <input id="github-token-input" type="password" placeholder="Paste ghp_... token here to view & clone private repos"
+                  class="flex-1 pro-input text-xs font-mono rounded-xl px-3 py-1.5" />
+                <button id="btn-save-github-token" type="button" class="pro-pill text-xs font-semibold px-3.5 py-1.5 rounded-xl">
+                  Connect Private Repos
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- Local / Already Cloned Workspaces -->

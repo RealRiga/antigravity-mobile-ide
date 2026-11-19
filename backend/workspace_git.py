@@ -105,13 +105,15 @@ class WorkspaceGitManager:
     def get_file_diff(self, rel_path: str) -> str:
         """Returns git diff for a file, or falls back to in-memory snapshot unified diff."""
         full_path = self._resolve_safe_path(rel_path)
-        git_diff = self._run_git(["diff", "HEAD", "--", rel_path])
-        if git_diff.strip():
-            return git_diff
+        has_head = self._has_valid_head()
+        if has_head:
+            git_diff = self._run_git(["diff", "HEAD", "--", rel_path])
+            if git_diff.strip() and "fatal:" not in git_diff:
+                return git_diff
 
         # Check unstaged diff
         unstaged = self._run_git(["diff", "--", rel_path])
-        if unstaged.strip():
+        if unstaged.strip() and "fatal:" not in unstaged:
             return unstaged
 
         # Fallback to snapshot comparison
@@ -130,6 +132,20 @@ class WorkspaceGitManager:
                 )
         return ""
 
+    def _has_valid_head(self) -> bool:
+        try:
+            res = subprocess.run(
+                ["git", "rev-parse", "--verify", "HEAD"],
+                cwd=self.workspace_dir,
+                capture_output=True,
+                text=True,
+                timeout=4,
+                check=False,
+            )
+            return res.returncode == 0
+        except Exception:
+            return False
+
     def _run_git(self, args: List[str]) -> str:
         try:
             res = subprocess.run(
@@ -140,11 +156,19 @@ class WorkspaceGitManager:
                 timeout=8,
                 check=False,
             )
-            return res.stdout if res.returncode == 0 else res.stderr
+            if res.returncode == 0:
+                return res.stdout
+            # Do not leak noisy git fatal messages when inside a container without .git
+            err = res.stderr.strip()
+            if "not a git repository" in err.lower() or "ambiguous argument 'head'" in err.lower():
+                return ""
+            return err
         except Exception as exc:
-            return f"Git execution error: {exc}"
+            return ""
 
     def _get_modified_paths(self) -> List[str]:
+        if not os.path.isdir(os.path.join(self.workspace_dir, ".git")):
+            return []
         out = self._run_git(["status", "--porcelain"])
         modified: List[str] = []
         for line in out.splitlines():
@@ -156,7 +180,22 @@ class WorkspaceGitManager:
         return modified
 
     def get_git_status(self) -> Dict[str, Any]:
-        branch = self._run_git(["rev-parse", "--abbrev-ref", "HEAD"]).strip() or "main"
+        is_git_repo = os.path.isdir(os.path.join(self.workspace_dir, ".git"))
+        if not is_git_repo:
+            return {
+                "is_git_repo": False,
+                "branch": "no-git-repo (click a repo in GitHub Repos to clone)",
+                "branches": ["main"],
+                "files": [],
+                "commits": [],
+                "diff": "",
+            }
+        has_head = self._has_valid_head()
+        branch = (
+            self._run_git(["rev-parse", "--abbrev-ref", "HEAD"]).strip()
+            if has_head
+            else "main"
+        ) or "main"
         porcelain = self._run_git(["status", "--porcelain"])
         files: List[Dict[str, str]] = []
         for line in porcelain.splitlines():
@@ -168,28 +207,30 @@ class WorkspaceGitManager:
         branches_out = self._run_git(["branch", "--format=%(refname:short)"])
         branches = [b.strip() for b in branches_out.splitlines() if b.strip()] or [branch]
 
-        log_out = self._run_git(
-            ["log", "-n", "8", "--pretty=format:%h|%an|%ar|%s"]
-        )
         commits: List[Dict[str, str]] = []
-        if "|" in log_out:
-            for row in log_out.splitlines():
-                parts = row.split("|", 3)
-                if len(parts) == 4:
-                    commits.append(
-                        {
-                            "hash": parts[0],
-                            "author": parts[1],
-                            "time": parts[2],
-                            "message": parts[3],
-                        }
-                    )
+        if has_head:
+            log_out = self._run_git(
+                ["log", "-n", "8", "--pretty=format:%h|%an|%ar|%s"]
+            )
+            if "|" in log_out:
+                for row in log_out.splitlines():
+                    parts = row.split("|", 3)
+                    if len(parts) == 4:
+                        commits.append(
+                            {
+                                "hash": parts[0],
+                                "author": parts[1],
+                                "time": parts[2],
+                                "message": parts[3],
+                            }
+                        )
 
-        full_diff = self._run_git(["diff", "HEAD"])
-        if not full_diff.strip() or "fatal:" in full_diff:
+        full_diff = self._run_git(["diff", "HEAD"]) if has_head else ""
+        if not full_diff.strip():
             full_diff = self._run_git(["diff"])
 
         return {
+            "is_git_repo": True,
             "branch": branch,
             "branches": branches,
             "files": files,
@@ -220,21 +261,31 @@ class WorkspaceGitManager:
         status["last_output"] = out
         return status
 
-    def git_clone_repo(self, repo_url: str, folder_name: Optional[str] = None) -> str:
-        """Clones a remote Git repository into a subfolder of the parent workspace."""
+    def git_clone_repo(
+        self,
+        repo_url: str,
+        folder_name: Optional[str] = None,
+        token: Optional[str] = None,
+    ) -> str:
+        """Clones a remote Git repository (public or private with token) into a subfolder of the parent workspace."""
         clean_url = repo_url.strip()
         if not clean_url:
             raise ValueError("Repository URL is required.")
         parent_dir = os.path.dirname(self.workspace_dir)
         inferred = folder_name or os.path.basename(clean_url.rstrip("/")).replace(".git", "")
-        safe_folder = "".join(c for c in inferred if c.isalnum() or c in ("-", "_")) or "cloned-repo"
+        safe_folder = "".join(c for c in inferred if c.isalnum() or c in ("-", "_", ".")) or "cloned-repo"
         target_dir = os.path.join(parent_dir, safe_folder)
 
-        if os.path.isdir(target_dir):
+        if os.path.isdir(target_dir) and os.path.isdir(os.path.join(target_dir, ".git")):
             return target_dir
 
+        auth_url = clean_url
+        gh_token = (token or os.environ.get("GITHUB_TOKEN", "")).strip()
+        if gh_token and clean_url.startswith("https://github.com/"):
+            auth_url = clean_url.replace("https://github.com/", f"https://x-access-token:{gh_token}@github.com/")
+
         res = subprocess.run(
-            ["git", "clone", clean_url, target_dir],
+            ["git", "clone", auth_url, target_dir],
             cwd=parent_dir,
             capture_output=True,
             text=True,
@@ -242,6 +293,10 @@ class WorkspaceGitManager:
             check=False,
         )
         if res.returncode != 0:
-            raise ValueError(f"git clone failed: {res.stderr.strip()}")
+            # Scrub token from error message if clone failed
+            err_text = res.stderr.strip()
+            if gh_token:
+                err_text = err_text.replace(gh_token, "***")
+            raise ValueError(f"git clone failed: {err_text}")
         return target_dir
 

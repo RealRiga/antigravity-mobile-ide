@@ -708,8 +708,9 @@ async function loadGitHubRepos() {
   if (!grid) return;
   const userEl = document.getElementById("github-username-input");
   const tokenEl = document.getElementById("github-token-input");
+  const authBadge = document.getElementById("github-auth-badge");
   const username = (userEl ? userEl.value.trim() : "RealRiga") || "RealRiga";
-  const token = tokenEl ? tokenEl.value.trim() : "";
+  const token = (tokenEl ? tokenEl.value.trim() : "") || state.githubToken;
   if (token) {
     state.githubToken = token;
     try {
@@ -726,6 +727,16 @@ async function loadGitHubRepos() {
   const data = await res.json();
   grid.innerHTML = "";
 
+  if (authBadge) {
+    if (data.authenticated) {
+      authBadge.textContent = "🔒 Public & Private Unlocked";
+      authBadge.className = "text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600";
+    } else {
+      authBadge.textContent = "Public Only (Add Token Below for Private)";
+      authBadge.className = "text-[10px] font-medium px-2 py-0.5 rounded-full pro-pill text-secondary";
+    }
+  }
+
   if (!data.repos || data.repos.length === 0) {
     grid.innerHTML = `<div class="text-xs text-tertiary col-span-2">No repositories found. Check the GitHub username or add a Personal Access Token.</div>`;
     return;
@@ -735,10 +746,16 @@ async function loadGitHubRepos() {
     const isCurrent = data.active_workspace === repo.name;
     const card = document.createElement("div");
     card.className = "pro-card rounded-2xl p-4 flex flex-col justify-between gap-3 hover:border-emerald-500 transition";
+    const visBadge = repo.private
+      ? `<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600">Private</span>`
+      : `<span class="text-[10px] px-2 py-0.5 rounded-full pro-pill text-tertiary">Public</span>`;
     card.innerHTML = `
       <div class="space-y-1">
         <div class="flex items-center justify-between gap-2">
-          <span class="text-xs font-semibold text-primary font-mono truncate">${escapeHtml(repo.name)}</span>
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span class="text-xs font-semibold text-primary font-mono truncate">${escapeHtml(repo.name)}</span>
+            ${visBadge}
+          </div>
           <span class="text-[10px] px-2 py-0.5 rounded-full pro-pill text-secondary shrink-0">${escapeHtml(repo.language)}</span>
         </div>
         <p class="text-[11px] text-secondary line-clamp-2">${escapeHtml(repo.description)}</p>
@@ -759,7 +776,11 @@ async function loadGitHubRepos() {
         const cloneRes = await fetch("/api/git/clone", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ repo_url: repo.clone_url, folder_name: repo.name }),
+          body: JSON.stringify({
+            repo_url: repo.clone_url,
+            folder_name: repo.name,
+            token: state.githubToken || null,
+          }),
         });
         const cloneData = await cloneRes.json();
         if (cloneRes.ok) {
@@ -782,34 +803,149 @@ const btnFetchGithub = document.getElementById("btn-fetch-github-repos");
 if (btnFetchGithub) {
   btnFetchGithub.addEventListener("click", loadGitHubRepos);
 }
+const btnSaveGhToken = document.getElementById("btn-save-github-token");
+if (btnSaveGhToken) {
+  btnSaveGhToken.addEventListener("click", loadGitHubRepos);
+}
 
-// 10. File Explorer, Editor & Diff Viewer (Split-Screen on PC, Stack on Mobile)
-async function loadFileTree() {
+// 10. File Explorer, Editor & Diff Viewer (GitHub-Style Folder Tree + Breadcrumb Navigation)
+state.allWorkspaceFiles = [];
+state.currentExplorerDir = "";
+
+function formatBytes(bytes) {
+  if (!bytes || bytes < 1024) return `${bytes || 0} B`;
+  return `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+async function loadFileTree(targetDir = state.currentExplorerDir) {
   const res = await fetch("/api/files");
   if (!res.ok) return;
   const data = await res.json();
+  state.allWorkspaceFiles = data.files || [];
+  renderExplorerDirectory(targetDir);
+}
+
+function renderExplorerDirectory(dirPath = "") {
+  state.currentExplorerDir = dirPath;
   const pane = document.getElementById("file-tree-pane");
+  if (!pane) return;
   pane.innerHTML = "";
 
-  (data.files || []).forEach((f) => {
-    const row = document.createElement("button");
-    row.type = "button";
-    row.className =
-      "w-full text-left pro-card rounded-xl px-3 py-2 hover:border-indigo-500 flex items-center justify-between gap-2 transition";
-    row.innerHTML = `
-      <div class="min-w-0">
-        <div class="text-xs font-mono font-medium text-primary truncate">${escapeHtml(f.path)}</div>
-        <div class="text-[10px] text-tertiary">${f.size} bytes</div>
-      </div>
-      ${
-        f.modified
-          ? `<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600">M</span>`
-          : `<span class="text-xs text-tertiary">›</span>`
-      }
-    `;
-    row.addEventListener("click", () => openFileInEditor(f.path));
-    pane.appendChild(row);
+  // 1. Breadcrumb Header (Like GitHub Repo Tree: root / folder / subfolder)
+  const crumbBar = document.createElement("div");
+  crumbBar.className = "flex items-center flex-wrap gap-1 px-2 py-1.5 mb-1.5 text-xs font-mono border-b pro-border";
+  const rootBtn = document.createElement("button");
+  rootBtn.type = "button";
+  rootBtn.className = "font-semibold text-indigo-600 hover:underline";
+  rootBtn.textContent = headerWorkspaceName ? headerWorkspaceName.textContent : "root";
+  rootBtn.addEventListener("click", () => renderExplorerDirectory(""));
+  crumbBar.appendChild(rootBtn);
+
+  if (dirPath) {
+    const parts = dirPath.split("/");
+    let acc = "";
+    parts.forEach((part) => {
+      acc = acc ? `${acc}/${part}` : part;
+      const sep = document.createElement("span");
+      sep.className = "text-tertiary";
+      sep.textContent = "/";
+      crumbBar.appendChild(sep);
+
+      const segBtn = document.createElement("button");
+      segBtn.type = "button";
+      segBtn.className = "font-medium text-primary hover:underline";
+      segBtn.textContent = part;
+      const target = acc;
+      segBtn.addEventListener("click", () => renderExplorerDirectory(target));
+      crumbBar.appendChild(segBtn);
+    });
+  }
+  pane.appendChild(crumbBar);
+
+  // 2. Parent ".." row if inside a subdirectory
+  if (dirPath) {
+    const upParts = dirPath.split("/");
+    upParts.pop();
+    const parentDir = upParts.join("/");
+    const upRow = document.createElement("button");
+    upRow.type = "button";
+    upRow.className = "w-full text-left pro-card rounded-xl px-3 py-2 hover:border-indigo-500 flex items-center gap-2 text-xs font-mono text-secondary transition";
+    upRow.innerHTML = `<span>↩</span><span>..</span>`;
+    upRow.addEventListener("click", () => renderExplorerDirectory(parentDir));
+    pane.appendChild(upRow);
+  }
+
+  // 3. Compute immediate child folders and immediate files inside `dirPath` (Just like GitHub!)
+  const childDirs = new Map();
+  const childFiles = [];
+  const prefix = dirPath ? `${dirPath}/` : "";
+
+  state.allWorkspaceFiles.forEach((f) => {
+    if (dirPath && !f.path.startsWith(prefix)) return;
+    const rel = dirPath ? f.path.slice(prefix.length) : f.path;
+    if (!rel) return;
+    const slashIdx = rel.indexOf("/");
+    if (slashIdx !== -1) {
+      const folderName = rel.slice(0, slashIdx);
+      const fullFolder = dirPath ? `${dirPath}/${folderName}` : folderName;
+      childDirs.set(folderName, {
+        name: folderName,
+        path: fullFolder,
+        count: (childDirs.get(folderName)?.count || 0) + 1,
+      });
+    } else {
+      childFiles.push(f);
+    }
   });
+
+  // Render folders first with folder icon
+  Array.from(childDirs.values())
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach((folder) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className =
+        "w-full text-left pro-card rounded-xl px-3 py-2.5 hover:border-indigo-500 flex items-center justify-between gap-2 transition";
+      row.innerHTML = `
+        <div class="flex items-center gap-2 min-w-0">
+          <svg class="w-4 h-4 text-indigo-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+          </svg>
+          <span class="text-xs font-mono font-semibold text-primary truncate">${escapeHtml(folder.name)}/</span>
+        </div>
+        <span class="text-[10px] text-tertiary shrink-0">${folder.count} items ›</span>
+      `;
+      row.addEventListener("click", () => renderExplorerDirectory(folder.path));
+      pane.appendChild(row);
+    });
+
+  // Render files second with file icon
+  childFiles
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach((f) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className =
+        "w-full text-left pro-card rounded-xl px-3 py-2.5 hover:border-indigo-500 flex items-center justify-between gap-2 transition";
+      row.innerHTML = `
+        <div class="flex items-center gap-2 min-w-0">
+          <svg class="w-4 h-4 text-tertiary shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          </svg>
+          <span class="text-xs font-mono font-medium text-primary truncate">${escapeHtml(f.name)}</span>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          ${
+            f.modified
+              ? `<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600">M</span>`
+              : ""
+          }
+          <span class="text-[10px] text-tertiary">${formatBytes(f.size)}</span>
+        </div>
+      `;
+      row.addEventListener("click", () => openFileInEditor(f.path));
+      pane.appendChild(row);
+    });
 }
 
 async function openFileInEditor(path) {

@@ -83,21 +83,37 @@ async def public_cron_health() -> Dict[str, Any]:
 
 @app.get("/api/github/repos")
 async def list_github_repos(username: str = "RealRiga", token: Optional[str] = None) -> Dict[str, Any]:
-    """Fetches GitHub repositories for a user (or authenticated token) so the user can 1-click switch workspaces."""
+    """Fetches GitHub repositories (including private repos via token or gh CLI) for 1-click switching."""
     clean_user = username.strip() or "RealRiga"
     gh_token = (token or os.environ.get("GITHUB_TOKEN", "")).strip()
+    # If running on local PC where `gh auth token` is logged in, automatically use it so private repos show up!
+    if not gh_token:
+        try:
+            import subprocess
+            gh_res = subprocess.run(
+                ["gh", "auth", "token"],
+                capture_output=True,
+                text=True,
+                timeout=3,
+                check=False,
+            )
+            if gh_res.returncode == 0 and gh_res.stdout.strip():
+                gh_token = gh_res.stdout.strip()
+        except Exception:
+            pass
+
     headers = {"Accept": "application/vnd.github+json", "User-Agent": "OwnStack-Antigravity-IDE"}
     if gh_token:
         headers["Authorization"] = f"Bearer {gh_token}"
-        url = "https://api.github.com/user/repos?sort=updated&per_page=30"
+        url = "https://api.github.com/user/repos?sort=updated&per_page=50&affiliation=owner,collaborator,organization_member"
     else:
-        url = f"https://api.github.com/users/{clean_user}/repos?sort=updated&per_page=30"
+        url = f"https://api.github.com/users/{clean_user}/repos?sort=updated&per_page=50"
 
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
             resp = await client.get(url, headers=headers)
             if resp.status_code != 200:
-                return {"repos": [], "error": f"GitHub API returned {resp.status_code}"}
+                return {"repos": [], "authenticated": bool(gh_token), "error": f"GitHub API returned {resp.status_code}"}
             raw_repos = resp.json()
             repos = [
                 {
@@ -115,11 +131,12 @@ async def list_github_repos(username: str = "RealRiga", token: Optional[str] = N
             ]
             return {
                 "username": clean_user,
+                "authenticated": bool(gh_token),
                 "active_workspace": os.path.basename(git_manager.workspace_dir),
                 "repos": repos,
             }
     except Exception as exc:
-        return {"repos": [], "error": str(exc)}
+        return {"repos": [], "authenticated": bool(gh_token), "error": str(exc)}
 
 
 @app.get("/api/workspaces")
@@ -185,6 +202,7 @@ class GitBranchPayload(BaseModel):
 class GitClonePayload(BaseModel):
     repo_url: str
     folder_name: Optional[str] = None
+    token: Optional[str] = None
 
 
 class RuntimeSettingsPayload(BaseModel):
@@ -333,7 +351,11 @@ async def checkout_branch(payload: GitBranchPayload) -> Dict[str, Any]:
 async def clone_remote_repo(payload: GitClonePayload) -> Dict[str, Any]:
     """Clones a remote Git repository into the cloud/local workspace and switches into it."""
     try:
-        cloned_dir = git_manager.git_clone_repo(payload.repo_url, payload.folder_name)
+        cloned_dir = git_manager.git_clone_repo(
+            payload.repo_url,
+            payload.folder_name,
+            token=payload.token,
+        )
         orchestrator.workspace_dir = cloned_dir
         git_manager.workspace_dir = cloned_dir
         return {
