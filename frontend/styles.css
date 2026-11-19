@@ -238,10 +238,15 @@ body {
   transform: scale(0.98);
 }
 
-/* Code Blocks */
+/* Code & Terminal Surface (Adapts cleanly to Light and Dark theme instead of hardcoded black box) */
 pre, code {
-  color-scheme: dark;
   accent-color: var(--accent-color);
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+.code-surface {
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
 }
 

@@ -365,8 +365,15 @@
           <div id="file-tree-pane" class="w-full lg:w-72 lg:border-r pro-border overflow-y-auto p-3 space-y-1 shrink-0"></div>
 
           <div id="file-editor-pane" class="hidden lg:flex flex-1 flex-col overflow-hidden">
-            <textarea id="file-editor-textarea" spellcheck="false" placeholder="Select a file from the explorer to view or edit..."
-              class="flex-1 w-full bg-zinc-950 text-zinc-100 font-mono text-xs p-4 focus:outline-none resize-none leading-relaxed select-text"></textarea>
+            <!-- Line-Numbered Syntax & Editable Code Canvas -->
+            <div id="code-editor-wrapper" class="flex-1 flex flex-col overflow-hidden code-surface">
+              <div class="shrink-0 px-4 py-1.5 border-b pro-border flex items-center justify-between text-[11px] font-mono text-tertiary bg-canvas">
+                <span id="editor-lang-badge">Plain Text</span>
+                <span id="editor-line-count">0 lines</span>
+              </div>
+              <textarea id="file-editor-textarea" spellcheck="false" placeholder="Select a file from the explorer to view or edit..."
+                class="flex-1 w-full code-surface text-xs p-4 focus:outline-none resize-none leading-relaxed select-text"></textarea>
+            </div>
             <div id="file-diff-viewer" class="hidden flex-1 overflow-y-auto pro-card m-3 rounded-2xl p-3.5 font-mono text-xs space-y-0.5 select-text"></div>
           </div>
         </div>
@@ -637,8 +644,8 @@
         Agent <strong id="approval-agent-name" class="text-primary">ollama-coder</strong> wants to execute:
       </p>
       <div class="bg-elevated border pro-border rounded-xl p-3 space-y-1.5">
-        <div class="text-xs font-mono font-semibold text-primary" id="approval-tool-name">run_command</div>
-        <pre id="approval-tool-args" class="text-[11px] font-mono text-zinc-200 bg-zinc-900 rounded-lg p-2.5 whitespace-pre-wrap break-all max-h-40 overflow-y-auto"></pre>
+        <div class="text-xs font-mono font-semibold text-indigo-600" id="approval-tool-name">run_command</div>
+        <pre id="approval-tool-args" class="text-[11px] font-mono code-surface border pro-border rounded-lg p-2.5 whitespace-pre-wrap break-all max-h-40 overflow-y-auto"></pre>
       </div>
       <form method="dialog" class="flex items-center justify-end gap-2 pt-1">
         <button type="submit" value="reject" autofocus

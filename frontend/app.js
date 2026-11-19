@@ -444,6 +444,30 @@ function connectWebSocket() {
 
 const SEND_ARROW_SVG = `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7" /></svg>`;
 const RUNNING_SPINNER_SVG = `<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z"></path></svg>`;
+const INLINE_SPINNER_SVG = `<svg class="w-3.5 h-3.5 animate-spin inline-block mr-1.5 -mt-0.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z"></path></svg>`;
+
+/**
+ * Wraps an async button click action with a visible loading spinner + brief "Done ✓" feedback
+ */
+async function withButtonLoader(btn, loadingText, actionFn) {
+  if (!btn || btn.disabled) return;
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.classList.add("opacity-75");
+  btn.innerHTML = `${INLINE_SPINNER_SVG}<span>${loadingText}</span>`;
+  try {
+    await Promise.all([
+      actionFn(),
+      new Promise((resolve) => setTimeout(resolve, 350)), // Ensure spinner is visibly perceived
+    ]);
+    btn.innerHTML = `<span>✓ Updated</span>`;
+    await new Promise((resolve) => setTimeout(resolve, 650));
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove("opacity-75");
+    btn.innerHTML = originalHtml;
+  }
+}
 
 function setGeneratingState(running) {
   state.isGenerating = Boolean(running);
@@ -801,11 +825,15 @@ async function loadGitHubRepos() {
 
 const btnFetchGithub = document.getElementById("btn-fetch-github-repos");
 if (btnFetchGithub) {
-  btnFetchGithub.addEventListener("click", loadGitHubRepos);
+  btnFetchGithub.addEventListener("click", () =>
+    withButtonLoader(btnFetchGithub, "Loading...", loadGitHubRepos)
+  );
 }
 const btnSaveGhToken = document.getElementById("btn-save-github-token");
 if (btnSaveGhToken) {
-  btnSaveGhToken.addEventListener("click", loadGitHubRepos);
+  btnSaveGhToken.addEventListener("click", () =>
+    withButtonLoader(btnSaveGhToken, "Connecting...", loadGitHubRepos)
+  );
 }
 
 // 10. File Explorer, Editor & Diff Viewer (GitHub-Style Folder Tree + Breadcrumb Navigation)
@@ -948,6 +976,24 @@ function renderExplorerDirectory(dirPath = "") {
     });
 }
 
+function detectLanguageLabel(filepath) {
+  const ext = (filepath.split(".").pop() || "").toLowerCase();
+  const map = {
+    py: "Python",
+    js: "JavaScript",
+    ts: "TypeScript",
+    html: "HTML",
+    css: "CSS",
+    json: "JSON",
+    md: "Markdown",
+    yml: "YAML",
+    yaml: "YAML",
+    sh: "Shell Script",
+    dart: "Dart / Flutter",
+  };
+  return map[ext] || "Code / Text";
+}
+
 async function openFileInEditor(path) {
   const res = await fetch(`/api/files/read?path=${encodeURIComponent(path)}`);
   if (!res.ok) return;
@@ -957,6 +1003,11 @@ async function openFileInEditor(path) {
   state.showingDiff = false;
 
   document.getElementById("current-file-label").textContent = data.path;
+  const langBadge = document.getElementById("editor-lang-badge");
+  const lineCount = document.getElementById("editor-line-count");
+  if (langBadge) langBadge.textContent = detectLanguageLabel(data.path);
+  if (lineCount) lineCount.textContent = `${data.lines || 0} lines`;
+
   if (window.innerWidth < 1024) {
     document.getElementById("file-tree-pane").classList.add("hidden");
   }
@@ -969,8 +1020,10 @@ async function openFileInEditor(path) {
   document.getElementById("btn-toggle-file-diff").classList.remove("hidden");
   document.getElementById("btn-toggle-file-diff").textContent = "View Diff";
 
+  const wrapper = document.getElementById("code-editor-wrapper");
   const textarea = document.getElementById("file-editor-textarea");
   const diffViewer = document.getElementById("file-diff-viewer");
+  if (wrapper) wrapper.classList.remove("hidden");
   textarea.classList.remove("hidden");
   diffViewer.classList.add("hidden");
   textarea.value = data.content;
@@ -1002,24 +1055,30 @@ document.getElementById("btn-save-file").addEventListener("click", async () => {
 });
 
 document.getElementById("btn-toggle-file-diff").addEventListener("click", () => {
+  const wrapper = document.getElementById("code-editor-wrapper");
   const textarea = document.getElementById("file-editor-textarea");
   const diffViewer = document.getElementById("file-diff-viewer");
   const btn = document.getElementById("btn-toggle-file-diff");
   state.showingDiff = !state.showingDiff;
 
   if (state.showingDiff) {
+    if (wrapper) wrapper.classList.add("hidden");
     textarea.classList.add("hidden");
     diffViewer.classList.remove("hidden");
     btn.textContent = "Edit Code";
     renderDiffLines(diffViewer, state.currentFileDiff || "No changes compared to HEAD / initial snapshot.");
   } else {
+    if (wrapper) wrapper.classList.remove("hidden");
     textarea.classList.remove("hidden");
     diffViewer.classList.add("hidden");
     btn.textContent = "View Diff";
   }
 });
 
-document.getElementById("btn-refresh-files").addEventListener("click", loadFileTree);
+const btnRefreshFiles = document.getElementById("btn-refresh-files");
+btnRefreshFiles.addEventListener("click", () =>
+  withButtonLoader(btnRefreshFiles, "Refreshing...", () => loadFileTree())
+);
 
 function renderDiffLines(container, diffText) {
   container.innerHTML = "";
@@ -1082,12 +1141,18 @@ async function loadGitStatus() {
   });
 }
 
-document.getElementById("btn-refresh-git").addEventListener("click", loadGitStatus);
+const btnRefreshGit = document.getElementById("btn-refresh-git");
+btnRefreshGit.addEventListener("click", () =>
+  withButtonLoader(btnRefreshGit, "Refreshing...", loadGitStatus)
+);
 
-document.getElementById("btn-git-stage-all").addEventListener("click", async () => {
-  await fetch("/api/git/stage", { method: "POST" });
-  await loadGitStatus();
-});
+const btnStageAll = document.getElementById("btn-git-stage-all");
+btnStageAll.addEventListener("click", () =>
+  withButtonLoader(btnStageAll, "Staging...", async () => {
+    await fetch("/api/git/stage", { method: "POST" });
+    await loadGitStatus();
+  })
+);
 
 document.getElementById("btn-git-commit").addEventListener("click", async () => {
   const input = document.getElementById("git-commit-msg");
@@ -1324,7 +1389,7 @@ function renderDocMarkdown(md) {
     if (line.trim().startsWith("```")) {
       if (!inCode) {
         inCode = true;
-        html += `<pre class="bg-zinc-950 text-zinc-100 rounded-xl p-3.5 font-mono text-[11px] overflow-x-auto my-2">`;
+        html += `<pre class="code-surface border pro-border rounded-xl p-3.5 font-mono text-[11px] overflow-x-auto my-2">`;
       } else {
         inCode = false;
         html += `</pre>`;
