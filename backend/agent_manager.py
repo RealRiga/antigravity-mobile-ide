@@ -432,10 +432,9 @@ class MultiAgentOrchestrator:
         active_key = (self.gemini_api_key or os.environ.get("GEMINI_API_KEY", "")).strip()
         if active_key:
             kwargs["api_key"] = active_key
-            if force_vertex is not None:
-                if force_vertex:
-                    kwargs["vertex"] = True
-            elif active_key.startswith("AQ."):
+            # Only enable Vertex mode if explicitly requested via USE_VERTEX_AI=true or force_vertex=True.
+            # Google AI Studio keys (both AIzaSy... and AQ....) work directly with the free Gemini API (vertex=False)!
+            if force_vertex is True or os.environ.get("USE_VERTEX_AI", "").lower() == "true":
                 kwargs["vertex"] = True
 
         return LocalAgentConfig(**kwargs)
