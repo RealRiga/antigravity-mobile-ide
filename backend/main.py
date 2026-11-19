@@ -656,4 +656,7 @@ async def serve_manifest() -> FileResponse:
 
 @app.get("/")
 async def serve_index() -> FileResponse:
-    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+    return FileResponse(
+        os.path.join(FRONTEND_DIR, "index.html"),
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
