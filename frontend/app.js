@@ -71,6 +71,51 @@ const approvalToolArgs = document.getElementById("approval-tool-args");
 
 const newAgentDialog = document.getElementById("new-agent-dialog");
 
+// OwnStack Custom Branded Picker Modal (Replaces native Android/iOS/Desktop <select> dropdowns everywhere)
+const pickerDialog = document.getElementById("picker-dialog");
+const pickerDialogTitle = document.getElementById("picker-dialog-title");
+const pickerDialogOptions = document.getElementById("picker-dialog-options");
+const btnClosePicker = document.getElementById("btn-close-picker");
+
+if (btnClosePicker && pickerDialog) {
+  btnClosePicker.addEventListener("click", () => pickerDialog.close(""));
+}
+
+function openCustomPicker({ title = "Select Option", options = [], selectedValue = null, onSelect }) {
+  if (!pickerDialog || !pickerDialogOptions) return;
+  if (pickerDialogTitle) pickerDialogTitle.textContent = title;
+  pickerDialogOptions.innerHTML = "";
+
+  options.forEach((opt) => {
+    const isSelected = String(opt.value) === String(selectedValue);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `w-full text-left rounded-xl px-3.5 py-2.5 flex items-center justify-between gap-2 transition border ${
+      isSelected
+        ? "bg-emerald-500/10 border-emerald-500/50 text-primary font-semibold"
+        : "bg-elevated pro-border text-primary hover:border-emerald-500/40"
+    }`;
+    btn.innerHTML = `
+      <div class="min-w-0">
+        <div class="text-xs truncate">${escapeHtml(opt.label)}</div>
+        ${opt.subtitle ? `<div class="text-[10px] text-tertiary truncate mt-0.5">${escapeHtml(opt.subtitle)}</div>` : ""}
+      </div>
+      ${
+        isSelected
+          ? `<span class="text-emerald-600 text-xs font-bold shrink-0">✓</span>`
+          : `<span class="text-tertiary text-xs shrink-0">›</span>`
+      }
+    `;
+    btn.addEventListener("click", () => {
+      pickerDialog.close("selected");
+      if (onSelect) onSelect(opt.value);
+    });
+    pickerDialogOptions.appendChild(btn);
+  });
+
+  if (!pickerDialog.open) pickerDialog.showModal();
+}
+
 // Universal Native <dialog> Confirmation Helper (Safe Cancel button has autofocus, returnValue reset on close)
 const confirmDialog = document.getElementById("confirm-dialog");
 const confirmDialogTitle = document.getElementById("confirm-dialog-title");
@@ -436,27 +481,36 @@ async function loadAgents() {
 }
 
 function renderAgentSelect() {
-  if (!activeAgentSelect) return;
-  activeAgentSelect.innerHTML = "";
-  state.agents.forEach((agent) => {
-    const opt = document.createElement("option");
-    opt.value = agent.id;
-    opt.textContent = agent.name;
-    if (agent.id === state.activeAgentId) opt.selected = true;
-    activeAgentSelect.appendChild(opt);
-  });
+  const labelEl = document.getElementById("picker-agent-label");
+  const active = state.agents.find((a) => a.id === state.activeAgentId);
+  if (labelEl && active) {
+    labelEl.textContent = active.name;
+  }
 }
 
-if (activeAgentSelect) {
-  activeAgentSelect.addEventListener("change", () => {
-    state.activeAgentId = activeAgentSelect.value;
-    const picked = state.agents.find((a) => a.id === state.activeAgentId);
-    if (picked) {
-      if (picked.provider === "ollama") state.lastOllamaAgentId = picked.id;
-      if (picked.provider === "gemini") state.lastGeminiAgentId = picked.id;
-    }
-    updateActiveAgentStrip();
-    renderAgentsRoster();
+const btnPickerAgent = document.getElementById("btn-picker-agent");
+if (btnPickerAgent) {
+  btnPickerAgent.addEventListener("click", () => {
+    openCustomPicker({
+      title: "Select Active Agent",
+      selectedValue: state.activeAgentId,
+      options: state.agents.map((a) => ({
+        value: a.id,
+        label: a.name,
+        subtitle: `${a.provider.toUpperCase()} • ${a.role}`,
+      })),
+      onSelect: (chosenId) => {
+        state.activeAgentId = chosenId;
+        const picked = state.agents.find((a) => a.id === chosenId);
+        if (picked) {
+          if (picked.provider === "ollama") state.lastOllamaAgentId = picked.id;
+          if (picked.provider === "cloud" || picked.provider === "gemini") state.lastCloudAgentId = picked.id;
+        }
+        renderAgentSelect();
+        updateActiveAgentStrip();
+        renderAgentsRoster();
+      },
+    });
   });
 }
 
@@ -1494,31 +1548,155 @@ function renderDiffLines(container, diffText) {
   });
 }
 
-// 11. Git Status, Diff, Commit & Branch Controls
+// 11. VS Code-Style Git Source Control (Staged/Unstaged, Per-File Diff Compare, Stage +, Unstage -, Discard ↺)
+let lastFullGitDiff = "";
+
+async function inspectSingleFileGitDiff(filepath) {
+  const diffBox = document.getElementById("git-diff-box");
+  const diffTitle = document.getElementById("git-diff-title");
+  const btnAll = document.getElementById("btn-git-show-all-diff");
+  if (diffTitle) diffTitle.textContent = `Diff: ${filepath}`;
+  if (btnAll) btnAll.classList.remove("hidden");
+  if (diffBox) diffBox.textContent = "Loading diff...";
+  const res = await fetch(`/api/git/file-diff?path=${encodeURIComponent(filepath)}`);
+  if (res.ok) {
+    const data = await res.json();
+    renderDiffLines(
+      diffBox,
+      data.diff && data.diff.trim() ? data.diff : `No diff lines (file "${filepath}" may be newly untracked or identical to HEAD).`
+    );
+  }
+}
+
+function buildGitFileRow(f, isStagedRow) {
+  const row = document.createElement("div");
+  row.className = "flex items-center justify-between gap-2 bg-elevated border pro-border px-3 py-2 rounded-xl";
+
+  const leftBtn = document.createElement("button");
+  leftBtn.type = "button";
+  leftBtn.className = "flex items-center gap-2 min-w-0 flex-1 text-left hover:opacity-80";
+  leftBtn.title = "Click to compare file diff";
+  leftBtn.innerHTML = `
+    <span class="font-mono font-bold text-[10px] px-1.5 py-0.5 rounded ${
+      isStagedRow ? "bg-emerald-500/15 text-emerald-600" : "bg-amber-500/15 text-amber-600"
+    } shrink-0">${escapeHtml(f.status)}</span>
+    <span class="font-mono text-primary font-medium truncate text-xs">${escapeHtml(f.path)}</span>
+  `;
+  leftBtn.addEventListener("click", () => inspectSingleFileGitDiff(f.path));
+
+  const actions = document.createElement("div");
+  actions.className = "flex items-center gap-1 shrink-0";
+
+  // Compare Diff button
+  const diffBtn = document.createElement("button");
+  diffBtn.type = "button";
+  diffBtn.className = "pro-pill text-[10px] font-semibold px-2 py-1 rounded-lg hover:border-indigo-500";
+  diffBtn.textContent = "Diff";
+  diffBtn.addEventListener("click", () => inspectSingleFileGitDiff(f.path));
+  actions.appendChild(diffBtn);
+
+  if (isStagedRow) {
+    // Unstage (-)
+    const unstageBtn = document.createElement("button");
+    unstageBtn.type = "button";
+    unstageBtn.className = "pro-pill text-xs font-bold px-2 py-0.5 rounded-lg";
+    unstageBtn.title = "Unstage file";
+    unstageBtn.textContent = "−";
+    unstageBtn.addEventListener("click", async () => {
+      await fetch("/api/git/unstage-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: f.path }),
+      });
+      await loadGitStatus();
+    });
+    actions.appendChild(unstageBtn);
+  } else {
+    // Stage (+)
+    const stageBtn = document.createElement("button");
+    stageBtn.type = "button";
+    stageBtn.className = "pro-pill text-xs font-bold text-emerald-600 px-2 py-0.5 rounded-lg";
+    stageBtn.title = "Stage file";
+    stageBtn.textContent = "+";
+    stageBtn.addEventListener("click", async () => {
+      await fetch("/api/git/stage-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: f.path }),
+      });
+      await loadGitStatus();
+    });
+    actions.appendChild(stageBtn);
+
+    // Discard / Revert (↺) with confirmation card!
+    const revertBtn = document.createElement("button");
+    revertBtn.type = "button";
+    revertBtn.className = "pro-pill text-xs font-bold text-rose-500 px-2 py-0.5 rounded-lg";
+    revertBtn.title = "Discard / Revert changes";
+    revertBtn.textContent = "↺";
+    revertBtn.addEventListener("click", async () => {
+      const ok = await askConfirmation({
+        title: "Discard File Changes?",
+        message: `Revert "${f.path}" back to the last commit? Unsaved changes in this file will be permanently lost.`,
+        confirmLabel: "Discard Changes",
+        badge: "Revert",
+        destructive: true,
+      });
+      if (!ok) return;
+      await fetch("/api/git/discard-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: f.path }),
+      });
+      await loadGitStatus();
+      await loadFileTree();
+    });
+    actions.appendChild(revertBtn);
+  }
+
+  row.appendChild(leftBtn);
+  row.appendChild(actions);
+  return row;
+}
+
 async function loadGitStatus() {
   const res = await fetch("/api/git/status");
   if (!res.ok) return;
   const data = await res.json();
   document.getElementById("git-current-branch").textContent = data.branch || "main";
 
+  const stagedSection = document.getElementById("git-staged-section");
+  const stagedContainer = document.getElementById("git-staged-files");
   const filesContainer = document.getElementById("git-changed-files");
+  if (stagedContainer) stagedContainer.innerHTML = "";
   filesContainer.innerHTML = "";
-  if (!data.files || data.files.length === 0) {
-    filesContainer.innerHTML = `<div class="text-tertiary text-xs">Working tree clean.</div>`;
-  } else {
-    data.files.forEach((f) => {
-      const el = document.createElement("div");
-      el.className = "flex items-center justify-between bg-elevated border pro-border px-3 py-1.5 rounded-xl";
-      el.innerHTML = `
-        <span class="font-mono text-primary font-medium truncate">${escapeHtml(f.path)}</span>
-        <span class="font-mono font-semibold text-amber-600 text-[11px]">${escapeHtml(f.status)}</span>
-      `;
-      filesContainer.appendChild(el);
-    });
+
+  const allFiles = data.files || [];
+  const stagedList = allFiles.filter((f) => f.staged);
+  const unstagedList = allFiles.filter((f) => f.unstaged || !f.staged);
+
+  if (stagedSection && stagedContainer) {
+    if (stagedList.length > 0) {
+      stagedSection.classList.remove("hidden");
+      stagedList.forEach((f) => stagedContainer.appendChild(buildGitFileRow(f, true)));
+    } else {
+      stagedSection.classList.add("hidden");
+    }
   }
 
+  if (unstagedList.length === 0) {
+    filesContainer.innerHTML = `<div class="text-tertiary text-xs">Working tree clean.</div>`;
+  } else {
+    unstagedList.forEach((f) => filesContainer.appendChild(buildGitFileRow(f, false)));
+  }
+
+  lastFullGitDiff = data.diff && data.diff.trim() ? data.diff : "No uncommitted changes.";
   const diffBox = document.getElementById("git-diff-box");
-  renderDiffLines(diffBox, data.diff && data.diff.trim() ? data.diff : "No uncommitted changes.");
+  const diffTitle = document.getElementById("git-diff-title");
+  const btnAll = document.getElementById("btn-git-show-all-diff");
+  if (diffTitle) diffTitle.textContent = "Unified Diff (Working Tree)";
+  if (btnAll) btnAll.classList.add("hidden");
+  renderDiffLines(diffBox, lastFullGitDiff);
 
   const commitsList = document.getElementById("git-commits-list");
   commitsList.innerHTML = "";
@@ -1533,6 +1711,17 @@ async function loadGitStatus() {
       <span class="font-mono text-[11px] font-semibold text-secondary shrink-0">${escapeHtml(c.hash)}</span>
     `;
     commitsList.appendChild(row);
+  });
+}
+
+const btnShowAllDiff = document.getElementById("btn-git-show-all-diff");
+if (btnShowAllDiff) {
+  btnShowAllDiff.addEventListener("click", () => {
+    const diffBox = document.getElementById("git-diff-box");
+    const diffTitle = document.getElementById("git-diff-title");
+    if (diffTitle) diffTitle.textContent = "Unified Diff (Working Tree)";
+    btnShowAllDiff.classList.add("hidden");
+    renderDiffLines(diffBox, lastFullGitDiff);
   });
 }
 
@@ -2028,11 +2217,20 @@ const RETENTION_MS = {
   never: Infinity,
 };
 
-const projectChatSelect = document.getElementById("project-chat-select");
-const chatRetentionSelect = document.getElementById("chat-retention-select");
+const btnPickerChat = document.getElementById("btn-picker-chat");
+const pickerChatLabel = document.getElementById("picker-chat-label");
+const btnPickerRetention = document.getElementById("btn-picker-retention");
+const pickerRetentionLabel = document.getElementById("picker-retention-label");
 const btnNewChat = document.getElementById("btn-new-chat");
 const btnPinChat = document.getElementById("btn-pin-chat");
 const btnDeleteChat = document.getElementById("btn-delete-chat");
+
+const RETENTION_LABELS = {
+  "24h": "Auto-del: 24h",
+  "7d": "Auto-del: 7d",
+  "30d": "Auto-del: 30d",
+  never: "Keep Forever",
+};
 
 function getAllProjectChatsStore() {
   try {
@@ -2095,23 +2293,16 @@ function loadProjectChats(workspaceName) {
 }
 
 function renderProjectChatControls(workspaceName) {
-  if (!projectChatSelect) return;
   const store = getAllProjectChatsStore();
   const list = store[workspaceName] || [];
-  projectChatSelect.innerHTML = "";
-  let activeChat = null;
+  const activeChat = list.find((c) => c.id === state.activeChatId) || list[0];
 
-  list.forEach((c) => {
-    const opt = document.createElement("option");
-    opt.value = c.id;
-    const prefix = c.pinned ? "📌 " : "";
-    opt.textContent = `${prefix}${c.title}`;
-    if (c.id === state.activeChatId) {
-      opt.selected = true;
-      activeChat = c;
-    }
-    projectChatSelect.appendChild(opt);
-  });
+  if (pickerChatLabel && activeChat) {
+    pickerChatLabel.textContent = `${activeChat.pinned ? "📌 " : ""}${activeChat.title}`;
+  }
+  if (pickerRetentionLabel) {
+    pickerRetentionLabel.textContent = RETENTION_LABELS[state.chatRetention] || "Auto-del: 7d";
+  }
 
   if (btnPinChat) {
     if (activeChat && activeChat.pinned) {
@@ -2187,22 +2378,47 @@ function appendMessageToActiveChat(role, content, checkpointSha = null) {
   return msgIndex;
 }
 
-if (chatRetentionSelect) {
-  chatRetentionSelect.value = state.chatRetention;
-  chatRetentionSelect.addEventListener("change", () => {
-    state.chatRetention = chatRetentionSelect.value;
-    try {
-      localStorage.setItem("ownstack_chat_retention", state.chatRetention);
-    } catch (e) {}
-    loadProjectChats(state.currentWorkspaceName);
+if (btnPickerRetention) {
+  btnPickerRetention.addEventListener("click", () => {
+    openCustomPicker({
+      title: "Chat Auto-Delete Duration",
+      selectedValue: state.chatRetention,
+      options: [
+        { value: "24h", label: "Auto-delete after 24 Hours", subtitle: "Unpinned chats expire after 1 day" },
+        { value: "7d", label: "Auto-delete after 7 Days", subtitle: "Recommended default retention" },
+        { value: "30d", label: "Auto-delete after 30 Days", subtitle: "Keep unpinned chats for a month" },
+        { value: "never", label: "Keep Forever", subtitle: "Never auto-delete any chats" },
+      ],
+      onSelect: (val) => {
+        state.chatRetention = val;
+        try {
+          localStorage.setItem("ownstack_chat_retention", val);
+        } catch (e) {}
+        loadProjectChats(state.currentWorkspaceName);
+      },
+    });
   });
 }
 
-if (projectChatSelect) {
-  projectChatSelect.addEventListener("change", () => {
-    state.activeChatId = projectChatSelect.value;
-    renderProjectChatControls(state.currentWorkspaceName);
-    renderActiveChatThread(state.currentWorkspaceName);
+if (btnPickerChat) {
+  btnPickerChat.addEventListener("click", () => {
+    const ws = state.currentWorkspaceName || "workspace";
+    const store = getAllProjectChatsStore();
+    const list = store[ws] || [];
+    openCustomPicker({
+      title: `Chats in ${ws}`,
+      selectedValue: state.activeChatId,
+      options: list.map((c) => ({
+        value: c.id,
+        label: `${c.pinned ? "📌 " : ""}${c.title}`,
+        subtitle: `${(c.messages || []).length} messages • ${new Date(c.updatedAt || c.createdAt).toLocaleDateString()}`,
+      })),
+      onSelect: (chosenId) => {
+        state.activeChatId = chosenId;
+        renderProjectChatControls(ws);
+        renderActiveChatThread(ws);
+      },
+    });
   });
 }
 

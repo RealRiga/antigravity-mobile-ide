@@ -197,12 +197,26 @@ class WorkspaceGitManager:
             else "main"
         ) or "main"
         porcelain = self._run_git(["status", "--porcelain"])
-        files: List[Dict[str, str]] = []
+        files: List[Dict[str, Any]] = []
         for line in porcelain.splitlines():
             if len(line) >= 3:
+                x = line[0]
+                y = line[1]
+                filepath = line[3:].strip().strip('"')
+                if " -> " in filepath:
+                    filepath = filepath.split(" -> ")[-1]
+                staged = x not in (" ", "?")
+                unstaged = y != " " or x == "?"
                 status_code = line[:2].strip() or "M"
-                filepath = line[3:].strip()
-                files.append({"status": status_code, "path": filepath})
+                files.append(
+                    {
+                        "status": status_code,
+                        "path": filepath,
+                        "staged": staged,
+                        "unstaged": unstaged,
+                        "untracked": x == "?",
+                    }
+                )
 
         branches_out = self._run_git(["branch", "--format=%(refname:short)"])
         branches = [b.strip() for b in branches_out.splitlines() if b.strip()] or [branch]
@@ -240,6 +254,33 @@ class WorkspaceGitManager:
 
     def git_stage_all(self) -> Dict[str, Any]:
         self._run_git(["add", "-A"])
+        return self.get_git_status()
+
+    def git_stage_file(self, rel_path: str) -> Dict[str, Any]:
+        self._resolve_safe_path(rel_path)
+        self._run_git(["add", "--", rel_path])
+        return self.get_git_status()
+
+    def git_unstage_file(self, rel_path: str) -> Dict[str, Any]:
+        self._resolve_safe_path(rel_path)
+        if self._has_valid_head():
+            self._run_git(["reset", "HEAD", "--", rel_path])
+        else:
+            self._run_git(["rm", "--cached", "--", rel_path])
+        return self.get_git_status()
+
+    def git_discard_file(self, rel_path: str) -> Dict[str, Any]:
+        full = self._resolve_safe_path(rel_path)
+        # Check if file is untracked
+        st = self._run_git(["status", "--porcelain", "--", rel_path])
+        if st.startswith("??"):
+            if os.path.isfile(full):
+                os.remove(full)
+        else:
+            if self._has_valid_head():
+                self._run_git(["checkout", "HEAD", "--", rel_path])
+            else:
+                self._run_git(["checkout", "--", rel_path])
         return self.get_git_status()
 
     def git_commit(self, message: str) -> Dict[str, Any]:

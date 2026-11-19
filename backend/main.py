@@ -398,9 +398,45 @@ async def get_git_status() -> Dict[str, Any]:
     return git_manager.get_git_status()
 
 
+class GitFileActionPayload(BaseModel):
+    path: str
+
+
 @app.post("/api/git/stage")
 async def stage_all_files() -> Dict[str, Any]:
     return git_manager.git_stage_all()
+
+
+@app.post("/api/git/stage-file")
+async def stage_single_file(payload: GitFileActionPayload) -> Dict[str, Any]:
+    try:
+        return git_manager.git_stage_file(payload.path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/git/unstage-file")
+async def unstage_single_file(payload: GitFileActionPayload) -> Dict[str, Any]:
+    try:
+        return git_manager.git_unstage_file(payload.path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/git/discard-file")
+async def discard_single_file(payload: GitFileActionPayload) -> Dict[str, Any]:
+    try:
+        return git_manager.git_discard_file(payload.path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/git/file-diff")
+async def get_single_file_diff(path: str) -> Dict[str, Any]:
+    try:
+        return {"path": path, "diff": git_manager.get_file_diff(path)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/api/git/commit")
