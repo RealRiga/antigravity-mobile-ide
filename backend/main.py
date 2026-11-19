@@ -31,7 +31,8 @@ from backend.workspace_git import WorkspaceGitManager
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.path.join(PROJECT_ROOT, "frontend")
 WORKSPACE_DIR = os.environ.get("AGY_WORKSPACE_DIR", PROJECT_ROOT)
-AGY_ACCESS_PIN = os.environ.get("AGY_ACCESS_PIN", "").strip()
+# Runtime toggle for PIN Lock (Can be toggled ON/OFF live from Agents & Config!)
+PIN_LOCK_ENABLED = bool(os.environ.get("AGY_ACCESS_PIN", "").strip())
 
 app = FastAPI(
     title="OwnStack IDE API",
@@ -50,12 +51,12 @@ app.add_middleware(
 
 @app.middleware("http")
 async def pin_auth_middleware(request: Request, call_next):
-    """Protects /api/* routes when AGY_ACCESS_PIN is configured (for safe Cloud/Tunnel deployment)."""
+    """Protects /api/* routes when PIN_LOCK_ENABLED is True and AGY_ACCESS_PIN is configured."""
     active_pin = os.environ.get("AGY_ACCESS_PIN", "").strip()
     # Allow public uptime monitors (cron-job.org / UptimeRobot) to ping /health without a PIN
     if request.url.path in ("/health", "/ping"):
         return await call_next(request)
-    if active_pin and request.url.path.startswith("/api/"):
+    if PIN_LOCK_ENABLED and active_pin and request.url.path.startswith("/api/"):
         client_pin = (
             request.headers.get("X-AGY-PIN")
             or request.query_params.get("pin")
@@ -64,7 +65,7 @@ async def pin_auth_middleware(request: Request, call_next):
         if client_pin != active_pin:
             return JSONResponse(
                 status_code=401,
-                content={"detail": "Invalid or missing AGY_ACCESS_PIN. Enter your PIN in the mobile app."},
+                content={"detail": "Invalid or missing AGY_ACCESS_PIN. Enter your PIN in OwnStack IDE."},
             )
     return await call_next(request)
 
@@ -77,16 +78,15 @@ async def public_cron_health() -> Dict[str, Any]:
     return {
         "status": "awake",
         "service": "ownstack-ide",
-        "pin_required": bool(active_pin),
+        "pin_required": bool(PIN_LOCK_ENABLED and active_pin),
     }
 
 
 @app.get("/api/github/repos")
 async def list_github_repos(username: str = "RealRiga", token: Optional[str] = None) -> Dict[str, Any]:
-    """Fetches GitHub repositories (including private repos via token or gh CLI) for 1-click switching."""
+    """Fetches ALL GitHub repositories (with automatic multi-page pagination) for 1-click workspace switching."""
     clean_user = username.strip() or "RealRiga"
     gh_token = (token or os.environ.get("GITHUB_TOKEN", "")).strip()
-    # If running on local PC where `gh auth token` is logged in, automatically use it so private repos show up!
     if not gh_token:
         try:
             import subprocess
@@ -102,39 +102,50 @@ async def list_github_repos(username: str = "RealRiga", token: Optional[str] = N
         except Exception:
             pass
 
-    headers = {"Accept": "application/vnd.github+json", "User-Agent": "OwnStack-Antigravity-IDE"}
+    headers = {"Accept": "application/vnd.github+json", "User-Agent": "OwnStack-IDE"}
     if gh_token:
         headers["Authorization"] = f"Bearer {gh_token}"
-        url = "https://api.github.com/user/repos?sort=updated&per_page=50&affiliation=owner,collaborator,organization_member"
+        base_url = "https://api.github.com/user/repos?sort=updated&per_page=100&affiliation=owner,collaborator,organization_member"
     else:
-        url = f"https://api.github.com/users/{clean_user}/repos?sort=updated&per_page=50"
+        base_url = f"https://api.github.com/users/{clean_user}/repos?sort=updated&per_page=100"
 
+    repos: List[Dict[str, Any]] = []
     try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            resp = await client.get(url, headers=headers)
-            if resp.status_code != 200:
-                return {"repos": [], "authenticated": bool(gh_token), "error": f"GitHub API returned {resp.status_code}"}
-            raw_repos = resp.json()
-            repos = [
-                {
-                    "name": r.get("name"),
-                    "full_name": r.get("full_name"),
-                    "description": r.get("description") or "No description",
-                    "clone_url": r.get("clone_url"),
-                    "html_url": r.get("html_url"),
-                    "language": r.get("language") or "Code",
-                    "updated_at": r.get("updated_at", "")[:10],
-                    "private": bool(r.get("private", False)),
-                }
-                for r in raw_repos
-                if isinstance(r, dict)
-            ]
-            return {
-                "username": clean_user,
-                "authenticated": bool(gh_token),
-                "active_workspace": os.path.basename(git_manager.workspace_dir),
-                "repos": repos,
-            }
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # Paginate up to 5 pages (up to 500 repositories!)
+            for page in range(1, 6):
+                resp = await client.get(f"{base_url}&page={page}", headers=headers)
+                if resp.status_code != 200:
+                    if page == 1:
+                        return {"repos": [], "authenticated": bool(gh_token), "error": f"GitHub API returned {resp.status_code}"}
+                    break
+                batch = resp.json()
+                if not isinstance(batch, list) or len(batch) == 0:
+                    break
+                for r in batch:
+                    if isinstance(r, dict):
+                        repos.append(
+                            {
+                                "name": r.get("name"),
+                                "full_name": r.get("full_name"),
+                                "description": r.get("description") or "No description",
+                                "clone_url": r.get("clone_url"),
+                                "html_url": r.get("html_url"),
+                                "language": r.get("language") or "Code",
+                                "updated_at": r.get("updated_at", "")[:10],
+                                "private": bool(r.get("private", False)),
+                            }
+                        )
+                if len(batch) < 100:
+                    break
+
+        return {
+            "username": clean_user,
+            "authenticated": bool(gh_token),
+            "total": len(repos),
+            "active_workspace": os.path.basename(git_manager.workspace_dir),
+            "repos": repos,
+        }
     except Exception as exc:
         return {"repos": [], "authenticated": bool(gh_token), "error": str(exc)}
 
@@ -209,22 +220,29 @@ class RuntimeSettingsPayload(BaseModel):
     ollama_base_url: Optional[str] = None
     gemini_api_key: Optional[str] = None
     workspace_dir: Optional[str] = None
+    pin_lock_enabled: Optional[bool] = None
 
 
 @app.get("/api/health")
 async def get_health() -> Dict[str, Any]:
     ollama_info = await orchestrator.check_ollama_status()
+    active_pin = os.environ.get("AGY_ACCESS_PIN", "").strip()
     return {
         "status": "ok",
         "has_agy_sdk": HAS_AGY_SDK,
         "workspace_dir": orchestrator.workspace_dir,
         "ollama": ollama_info,
         "has_gemini_key": bool(orchestrator.gemini_api_key or os.environ.get("GEMINI_API_KEY")),
+        "pin_lock_enabled": bool(PIN_LOCK_ENABLED and active_pin),
+        "has_pin_configured": bool(active_pin),
     }
 
 
 @app.post("/api/settings")
 async def update_settings(payload: RuntimeSettingsPayload) -> Dict[str, Any]:
+    global PIN_LOCK_ENABLED
+    if payload.pin_lock_enabled is not None:
+        PIN_LOCK_ENABLED = bool(payload.pin_lock_enabled)
     if payload.ollama_base_url:
         orchestrator.ollama_base_url = payload.ollama_base_url.strip()
         for p in orchestrator.profiles.values():
@@ -382,7 +400,7 @@ async def clone_remote_repo(payload: GitClonePayload) -> Dict[str, Any]:
 @app.websocket("/ws/chat")
 async def websocket_chat_endpoint(websocket: WebSocket) -> None:
     active_pin = os.environ.get("AGY_ACCESS_PIN", "").strip()
-    if active_pin:
+    if PIN_LOCK_ENABLED and active_pin:
         ws_pin = (websocket.query_params.get("pin") or "").strip()
         if ws_pin != active_pin:
             await websocket.close(code=1008, reason="Invalid AGY_ACCESS_PIN")

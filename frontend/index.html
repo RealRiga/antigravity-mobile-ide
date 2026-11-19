@@ -455,7 +455,13 @@
           </div>
 
           <div class="space-y-2">
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-tertiary px-1">GitHub Repositories</h3>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+              <h3 class="text-xs font-semibold uppercase tracking-wider text-tertiary">
+                GitHub Repositories <span id="github-repo-count" class="font-mono text-primary"></span>
+              </h3>
+              <input id="github-repo-search" type="search" placeholder="Search repositories..."
+                class="pro-input text-xs rounded-xl px-3 py-1.5 w-full sm:w-56" />
+            </div>
             <div id="github-repos-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
           </div>
         </div>
@@ -576,6 +582,18 @@
                 <input id="setting-access-pin" type="password" placeholder="Enter your access PIN"
                   class="w-full pro-input text-xs font-mono rounded-xl px-3 py-2" />
               </div>
+
+              <!-- Live PIN Lock Toggle (Turn OFF to share your deployed URL openly, ON to lock it!) -->
+              <div class="flex items-center justify-between bg-elevated border pro-border rounded-xl px-3.5 py-2.5 gap-3">
+                <div>
+                  <div class="text-xs font-semibold text-primary">Require Access PIN for Visitors</div>
+                  <div class="text-[11px] text-secondary">Turn OFF to let others try your deployed URL without a password; turn ON to lock it back to you.</div>
+                </div>
+                <label class="inline-flex items-center cursor-pointer shrink-0">
+                  <input id="setting-pin-lock-toggle" type="checkbox" class="w-4 h-4 accent-emerald-600" checked />
+                </label>
+              </div>
+
               <button id="btn-save-settings" type="button" class="w-full btn-primary-pro text-xs py-2.5 rounded-xl">
                 Save Connection Settings
               </button>

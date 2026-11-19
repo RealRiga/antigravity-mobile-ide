@@ -365,6 +365,10 @@ async function refreshHealth() {
         loadProjectChats(wsName);
       }
     }
+    const pinToggle = document.getElementById("setting-pin-lock-toggle");
+    if (pinToggle && typeof data.pin_lock_enabled === "boolean") {
+      pinToggle.checked = data.pin_lock_enabled;
+    }
     const cloudState = data.has_gemini_key ? "Cloud AI Ready" : "Cloud AI";
     if (ollamaStatusPill) {
       if (data.ollama && data.ollama.online) {
@@ -822,47 +826,35 @@ async function loadLocalWorkspaces() {
   });
 }
 
-async function loadGitHubRepos() {
+state.loadedGitHubRepos = [];
+state.loadedActiveWorkspace = "";
+
+function renderFilteredGitHubRepos(query = "") {
   const grid = document.getElementById("github-repos-grid");
+  const countBadge = document.getElementById("github-repo-count");
   if (!grid) return;
-  const userEl = document.getElementById("github-username-input");
-  const tokenEl = document.getElementById("github-token-input");
-  const authBadge = document.getElementById("github-auth-badge");
-  const username = (userEl ? userEl.value.trim() : "RealRiga") || "RealRiga";
-  const token = (tokenEl ? tokenEl.value.trim() : "") || state.githubToken;
-  if (token) {
-    state.githubToken = token;
-    try {
-      localStorage.setItem("agy_github_token", token);
-    } catch (e) {}
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? state.loadedGitHubRepos.filter(
+        (r) =>
+          (r.name || "").toLowerCase().includes(q) ||
+          (r.description || "").toLowerCase().includes(q) ||
+          (r.language || "").toLowerCase().includes(q)
+      )
+    : state.loadedGitHubRepos;
+
+  if (countBadge) {
+    countBadge.textContent = `(${filtered.length}${q ? ` of ${state.loadedGitHubRepos.length}` : ""})`;
   }
 
-  grid.innerHTML = `<div class="text-xs text-tertiary col-span-2">Loading GitHub repositories for @${escapeHtml(username)}...</div>`;
-  const url = `/api/github/repos?username=${encodeURIComponent(username)}${
-    token ? `&token=${encodeURIComponent(token)}` : ""
-  }`;
-  const res = await fetch(url);
-  if (!res.ok) return;
-  const data = await res.json();
   grid.innerHTML = "";
-
-  if (authBadge) {
-    if (data.authenticated) {
-      authBadge.textContent = "🔒 Public & Private Unlocked";
-      authBadge.className = "text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600";
-    } else {
-      authBadge.textContent = "Public Only (Add Token Below for Private)";
-      authBadge.className = "text-[10px] font-medium px-2 py-0.5 rounded-full pro-pill text-secondary";
-    }
-  }
-
-  if (!data.repos || data.repos.length === 0) {
-    grid.innerHTML = `<div class="text-xs text-tertiary col-span-2">No repositories found. Check the GitHub username or add a Personal Access Token.</div>`;
+  if (filtered.length === 0) {
+    grid.innerHTML = `<div class="text-xs text-tertiary col-span-2">No matching repositories found.</div>`;
     return;
   }
 
-  data.repos.forEach((repo) => {
-    const isCurrent = data.active_workspace === repo.name;
+  filtered.forEach((repo) => {
+    const isCurrent = state.loadedActiveWorkspace === repo.name;
     const card = document.createElement("div");
     card.className = "pro-card rounded-2xl p-4 flex flex-col justify-between gap-3 hover:border-emerald-500 transition";
     const visBadge = repo.private
@@ -916,6 +908,50 @@ async function loadGitHubRepos() {
     });
     grid.appendChild(card);
   });
+}
+
+async function loadGitHubRepos() {
+  const grid = document.getElementById("github-repos-grid");
+  if (!grid) return;
+  const userEl = document.getElementById("github-username-input");
+  const tokenEl = document.getElementById("github-token-input");
+  const authBadge = document.getElementById("github-auth-badge");
+  const searchEl = document.getElementById("github-repo-search");
+  const username = (userEl ? userEl.value.trim() : "RealRiga") || "RealRiga";
+  const token = (tokenEl ? tokenEl.value.trim() : "") || state.githubToken;
+  if (token) {
+    state.githubToken = token;
+    try {
+      localStorage.setItem("agy_github_token", token);
+    } catch (e) {}
+  }
+
+  grid.innerHTML = `<div class="text-xs text-tertiary col-span-2">Loading all GitHub repositories for @${escapeHtml(username)}...</div>`;
+  const url = `/api/github/repos?username=${encodeURIComponent(username)}${
+    token ? `&token=${encodeURIComponent(token)}` : ""
+  }`;
+  const res = await fetch(url);
+  if (!res.ok) return;
+  const data = await res.json();
+
+  if (authBadge) {
+    if (data.authenticated) {
+      authBadge.textContent = `🔒 Public & Private (${(data.repos || []).length})`;
+      authBadge.className = "text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600";
+    } else {
+      authBadge.textContent = `Public Only (${(data.repos || []).length}) — Add Token for Private`;
+      authBadge.className = "text-[10px] font-medium px-2 py-0.5 rounded-full pro-pill text-secondary";
+    }
+  }
+
+  state.loadedGitHubRepos = data.repos || [];
+  state.loadedActiveWorkspace = data.active_workspace || "";
+  renderFilteredGitHubRepos(searchEl ? searchEl.value : "");
+}
+
+const ghSearchInput = document.getElementById("github-repo-search");
+if (ghSearchInput) {
+  ghSearchInput.addEventListener("input", () => renderFilteredGitHubRepos(ghSearchInput.value));
 }
 
 const btnFetchGithub = document.getElementById("btn-fetch-github-repos");
@@ -1509,6 +1545,7 @@ document.getElementById("btn-save-settings").addEventListener("click", async () 
   const ollamaUrl = document.getElementById("setting-ollama-url").value.trim();
   const geminiKey = document.getElementById("setting-gemini-key").value.trim();
   const pinInput = document.getElementById("setting-access-pin");
+  const pinToggle = document.getElementById("setting-pin-lock-toggle");
   if (pinInput) {
     setAccessPin(pinInput.value.trim());
   }
@@ -1518,6 +1555,7 @@ document.getElementById("btn-save-settings").addEventListener("click", async () 
     body: JSON.stringify({
       ollama_base_url: ollamaUrl,
       gemini_api_key: geminiKey || null,
+      pin_lock_enabled: pinToggle ? pinToggle.checked : null,
     }),
   });
   if (state.ws) {
@@ -1527,6 +1565,18 @@ document.getElementById("btn-save-settings").addEventListener("click", async () 
   await loadAgents();
   connectWebSocket();
 });
+
+const pinLockToggleEl = document.getElementById("setting-pin-lock-toggle");
+if (pinLockToggleEl) {
+  pinLockToggleEl.addEventListener("change", async () => {
+    await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin_lock_enabled: pinLockToggleEl.checked }),
+    });
+    await refreshHealth();
+  });
+}
 
 document.getElementById("btn-test-ollama").addEventListener("click", async () => {
   const ollamaUrl = document.getElementById("setting-ollama-url").value.trim();
