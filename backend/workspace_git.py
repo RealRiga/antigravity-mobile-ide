@@ -261,6 +261,43 @@ class WorkspaceGitManager:
         status["last_output"] = out
         return status
 
+    def create_checkpoint(self, label: str = "prompt-checkpoint") -> Dict[str, Any]:
+        """Creates a non-destructive Git tree snapshot (using git stash create) so users can restore code anytime."""
+        if not os.path.isdir(os.path.join(self.workspace_dir, ".git")):
+            return {"created": False, "reason": "Not a git repository"}
+        # Stage untracked files with intent-to-add or commit a lightweight snapshot ref
+        self._run_git(["add", "-A"])
+        tree_sha = self._run_git(["write-tree"]).strip()
+        if not tree_sha or "fatal:" in tree_sha:
+            return {"created": False, "reason": "Could not snapshot workspace tree"}
+        # Unstage index changes so git status stays clean for the user
+        if self._has_valid_head():
+            self._run_git(["reset", "--quiet"])
+        return {
+            "created": True,
+            "tree_sha": tree_sha,
+            "label": label[:80],
+            "workspace": os.path.basename(self.workspace_dir),
+        }
+
+    def restore_checkpoint(self, tree_sha: str) -> Dict[str, Any]:
+        """Restores the workspace files back to the exact state captured in `tree_sha`."""
+        clean_sha = tree_sha.strip()
+        if not clean_sha or not all(c in "0123456789abcdef" for c in clean_sha.lower()):
+            raise ValueError("Invalid checkpoint hash.")
+        if not os.path.isdir(os.path.join(self.workspace_dir, ".git")):
+            raise ValueError("Workspace is not a Git repository.")
+        # Read the saved tree back into index and force-checkout files into working directory
+        read_res = self._run_git(["read-tree", "--reset", "-u", clean_sha])
+        if self._has_valid_head():
+            self._run_git(["reset", "--quiet"])
+        return {
+            "restored": True,
+            "tree_sha": clean_sha,
+            "output": read_res,
+            "git_status": self.get_git_status(),
+        }
+
     def git_clone_repo(
         self,
         repo_url: str,

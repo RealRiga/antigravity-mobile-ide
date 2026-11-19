@@ -86,6 +86,9 @@ class MultiAgentOrchestrator:
         self.pending_approvals: Dict[str, PendingApproval] = {}
         self.ollama_base_url: str = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
         self.gemini_api_key: str = os.environ.get("GEMINI_API_KEY", "")
+        self.openai_api_key: str = os.environ.get("OPENAI_API_KEY", "")
+        self.openai_base_url: str = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+        self.openai_model: str = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
         self._init_default_profiles()
 
     def _init_default_profiles(self) -> None:
@@ -517,10 +520,21 @@ class MultiAgentOrchestrator:
             )
             return
 
-        # Full Google Antigravity SDK Execution with Multi-Model 503 High-Demand Failover
+        # Direct OpenAI / Free OpenAI-Compatible Provider (OpenAI, OpenRouter, Groq)
+        if profile.provider == "openai":
+            await self._stream_openai_compat(
+                profile=profile,
+                prompt=prompt,
+                emit=emit,
+                api_key=(self.openai_api_key or os.environ.get("OPENAI_API_KEY", "")).strip(),
+                base_url=(profile.base_url or self.openai_base_url or "https://api.openai.com/v1").strip(),
+                model=(profile.model or self.openai_model or "gpt-4o-mini").strip(),
+            )
+            return
+
+        # Full Google Antigravity SDK Execution with Multi-Model 503 High-Demand Failover + OpenAI Backup
         try:
             full_text: List[str] = []
-            # Build a deduplicated failover cascade across fast free-tier models so a 503 spike on one model never fails the turn!
             if profile.provider in ("cloud", "gemini"):
                 raw_candidates = [
                     profile.model.strip(),
@@ -595,7 +609,21 @@ class MultiAgentOrchestrator:
             await emit({"type": "turn_end", "agent_id": profile.id, "content": final_answer})
 
         except Exception as exc:
-            err_msg = str(exc).strip() or f"{exc.__class__.__name__} (Request timed out on cloud server — please tap Send again)"
+            err_msg = str(exc).strip() or f"{exc.__class__.__name__}"
+            # Last-resort automatic failover to OpenAI / OpenRouter / Groq if configured so users NEVER hit a dead-end 503!
+            backup_openai_key = (self.openai_api_key or os.environ.get("OPENAI_API_KEY", "")).strip()
+            if backup_openai_key and profile.provider in ("cloud", "gemini"):
+                ok = await self._stream_openai_compat(
+                    profile=profile,
+                    prompt=prompt,
+                    emit=emit,
+                    api_key=backup_openai_key,
+                    base_url=(self.openai_base_url or "https://api.openai.com/v1").strip(),
+                    model=(self.openai_model or "gpt-4o-mini").strip(),
+                )
+                if ok:
+                    return
+
             if isinstance(exc, asyncio.TimeoutError):
                 err_msg = "Request timed out while waiting for the AI model response. Please try sending your message again."
             if "SERVICE_DISABLED" in err_msg or "aiplatform.googleapis.com" in err_msg:
@@ -628,6 +656,102 @@ class MultiAgentOrchestrator:
                     "message": f"Agent Error: {err_msg}",
                 }
             )
+
+    async def _stream_openai_compat(
+        self,
+        profile: AgentProfile,
+        prompt: str,
+        emit: EventCallback,
+        api_key: str,
+        base_url: str,
+        model: str,
+    ) -> bool:
+        """Streams chat completions from OpenAI, OpenRouter (free tier), or Groq (free tier)."""
+        if not api_key:
+            await emit(
+                {
+                    "type": "error",
+                    "agent_id": profile.id,
+                    "message": "No OpenAI / OpenRouter / Groq API key configured. Add one in Agents & Config.",
+                }
+            )
+            return False
+
+        endpoint = f"{base_url.rstrip('/')}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://antigravity-mobile-ide.onrender.com",
+            "X-Title": "OwnStack IDE",
+        }
+        messages = [
+            {
+                "role": "system",
+                "content": profile.system_instructions
+                or "You are a helpful coding assistant inside OwnStack IDE.",
+            },
+            {"role": "user", "content": prompt},
+        ]
+        payload = {
+            "model": model,
+            "messages": messages,
+            "stream": True,
+        }
+        full_text: List[str] = []
+        try:
+            async with httpx.AsyncClient(timeout=45.0) as client:
+                async with client.stream("POST", endpoint, headers=headers, json=payload) as resp:
+                    if resp.status_code != 200:
+                        body = await resp.aread()
+                        await emit(
+                            {
+                                "type": "error",
+                                "agent_id": profile.id,
+                                "message": f"OpenAI-Compatible Provider Error ({resp.status_code}): {body.decode('utf-8', 'ignore')[:260]}",
+                            }
+                        )
+                        return False
+                    async for line in resp.aiter_lines():
+                        if not line.startswith("data: "):
+                            continue
+                        data_str = line[6:].strip()
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            import json
+                            chunk_obj = json.loads(data_str)
+                            delta = (
+                                chunk_obj.get("choices", [{}])[0]
+                                .get("delta", {})
+                                .get("content", "")
+                            )
+                            if delta:
+                                full_text.append(delta)
+                                await emit(
+                                    {
+                                        "type": "token_delta",
+                                        "agent_id": profile.id,
+                                        "delta": delta,
+                                    }
+                                )
+                        except Exception:
+                            continue
+
+            final_answer = "".join(full_text)
+            self.conversation_history.setdefault(profile.id, []).append(
+                {"role": "assistant", "content": final_answer, "timestamp": time.time()}
+            )
+            await emit({"type": "turn_end", "agent_id": profile.id, "content": final_answer})
+            return True
+        except Exception as exc:
+            await emit(
+                {
+                    "type": "error",
+                    "agent_id": profile.id,
+                    "message": f"OpenAI-Compatible Fallback Error: {exc}",
+                }
+            )
+            return False
 
     async def _run_interactive_sandbox_fallback(
         self,

@@ -228,8 +228,19 @@ class GitClonePayload(BaseModel):
 class RuntimeSettingsPayload(BaseModel):
     ollama_base_url: Optional[str] = None
     gemini_api_key: Optional[str] = None
+    openai_api_key: Optional[str] = None
+    openai_base_url: Optional[str] = None
+    openai_model: Optional[str] = None
     workspace_dir: Optional[str] = None
     pin_lock_enabled: Optional[bool] = None
+
+
+class CheckpointCreatePayload(BaseModel):
+    label: str = "prompt-checkpoint"
+
+
+class CheckpointRestorePayload(BaseModel):
+    tree_sha: str
 
 
 @app.get("/api/health")
@@ -242,6 +253,9 @@ async def get_health() -> Dict[str, Any]:
         "workspace_dir": orchestrator.workspace_dir,
         "ollama": ollama_info,
         "has_gemini_key": bool(orchestrator.gemini_api_key or os.environ.get("GEMINI_API_KEY")),
+        "has_openai_key": bool(orchestrator.openai_api_key or os.environ.get("OPENAI_API_KEY")),
+        "openai_base_url": orchestrator.openai_base_url,
+        "openai_model": orchestrator.openai_model,
         "pin_lock_enabled": bool(PIN_LOCK_ENABLED and active_pin),
         "has_pin_configured": bool(active_pin),
     }
@@ -260,12 +274,31 @@ async def update_settings(payload: RuntimeSettingsPayload) -> Dict[str, Any]:
                 p.base_url = base if base.endswith("/v1") else f"{base}/v1"
     if payload.gemini_api_key is not None:
         orchestrator.gemini_api_key = payload.gemini_api_key.strip()
+    if payload.openai_api_key is not None:
+        orchestrator.openai_api_key = payload.openai_api_key.strip()
+    if payload.openai_base_url:
+        orchestrator.openai_base_url = payload.openai_base_url.strip()
+    if payload.openai_model:
+        orchestrator.openai_model = payload.openai_model.strip()
     if payload.workspace_dir and os.path.isdir(payload.workspace_dir):
         abs_ws = os.path.abspath(payload.workspace_dir)
         orchestrator.workspace_dir = abs_ws
         git_manager.workspace_dir = abs_ws
 
     return await get_health()
+
+
+@app.post("/api/checkpoints/create")
+async def create_workspace_checkpoint(payload: CheckpointCreatePayload) -> Dict[str, Any]:
+    return git_manager.create_checkpoint(payload.label)
+
+
+@app.post("/api/checkpoints/restore")
+async def restore_workspace_checkpoint(payload: CheckpointRestorePayload) -> Dict[str, Any]:
+    try:
+        return git_manager.restore_checkpoint(payload.tree_sha)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/api/ollama/status")

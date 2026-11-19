@@ -725,8 +725,110 @@ document.getElementById("btn-review-approval").addEventListener("click", () => {
   }
 });
 
-// 8. Send Chat Prompt + Enter Key Handler
-function sendChatPrompt(promptText) {
+// 8. Send Chat Prompt + Automatic Code Checkpoint + Enter Key Handler
+async function createPromptCheckpoint(label) {
+  try {
+    const res = await fetch("/api/checkpoints/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label: label.slice(0, 60) }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.created && data.tree_sha) return data.tree_sha;
+    }
+  } catch (e) {}
+  return null;
+}
+
+async function restoreCodeToCheckpoint(treeSha, msgIndex = null) {
+  if (!treeSha) return;
+  try {
+    const res = await fetch("/api/checkpoints/restore", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tree_sha: treeSha }),
+    });
+    if (res.ok) {
+      if (msgIndex !== null) {
+        const ws = state.currentWorkspaceName || "workspace";
+        const store = getAllProjectChatsStore();
+        const chat = (store[ws] || []).find((c) => c.id === state.activeChatId);
+        if (chat) {
+          chat.messages = chat.messages.slice(0, msgIndex);
+          chat.updatedAt = Date.now();
+          saveAllProjectChatsStore(store);
+          renderActiveChatThread(ws);
+        }
+      }
+      await loadFileTree();
+      await loadGitStatus();
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
+function buildUserMessageRow(text, msgIndex, checkpointSha) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "flex flex-col items-end gap-1 group";
+
+  const bubble = document.createElement("div");
+  bubble.className = "pro-pill rounded-2xl rounded-br-sm px-4 py-2.5 text-sm text-primary max-w-[85%]";
+  bubble.textContent = text;
+  wrapper.appendChild(bubble);
+
+  const actions = document.createElement("div");
+  actions.className = "flex items-center gap-2 text-[10px] text-tertiary px-1";
+
+  // Edit Previous Prompt Button
+  const editBtn = document.createElement("button");
+  editBtn.type = "button";
+  editBtn.className = "hover:text-primary font-medium transition";
+  editBtn.textContent = "✏️ Edit";
+  editBtn.addEventListener("click", async () => {
+    if (state.isGenerating) return;
+    if (checkpointSha) {
+      await restoreCodeToCheckpoint(checkpointSha, msgIndex);
+    } else {
+      const ws = state.currentWorkspaceName || "workspace";
+      const store = getAllProjectChatsStore();
+      const chat = (store[ws] || []).find((c) => c.id === state.activeChatId);
+      if (chat) {
+        chat.messages = chat.messages.slice(0, msgIndex);
+        saveAllProjectChatsStore(store);
+        renderActiveChatThread(ws);
+      }
+    }
+    chatInput.value = text;
+    updateSendButtonState();
+    chatInput.focus();
+  });
+  actions.appendChild(editBtn);
+
+  // Restore Code Checkpoint Button (if a Git tree snapshot was captured before this prompt)
+  if (checkpointSha) {
+    const restoreBtn = document.createElement("button");
+    restoreBtn.type = "button";
+    restoreBtn.className = "hover:text-emerald-600 font-medium transition";
+    restoreBtn.title = `Restore workspace files to snapshot ${checkpointSha.slice(0, 7)}`;
+    restoreBtn.textContent = `↺ Restore Code (${checkpointSha.slice(0, 6)})`;
+    restoreBtn.addEventListener("click", async () => {
+      if (state.isGenerating) return;
+      restoreBtn.textContent = "Restoring...";
+      const ok = await restoreCodeToCheckpoint(checkpointSha, msgIndex);
+      if (ok) {
+        restoreBtn.textContent = "✓ Code Restored";
+      }
+    });
+    actions.appendChild(restoreBtn);
+  }
+
+  wrapper.appendChild(actions);
+  return wrapper;
+}
+
+async function sendChatPrompt(promptText) {
   const text = promptText.trim();
   if (!text || state.isGenerating) return;
 
@@ -738,16 +840,12 @@ function sendChatPrompt(promptText) {
   setGeneratingState(true);
   if (chatEmptyState) chatEmptyState.classList.add("hidden");
 
-  appendMessageToActiveChat("user", text);
+  // Snapshot workspace code BEFORE the agent runs so user can restore to this exact checkpoint!
+  const checkpointSha = await createPromptCheckpoint(text);
+  const msgIndex = appendMessageToActiveChat("user", text, checkpointSha);
 
-  const wrapper = document.createElement("div");
-  wrapper.className = "flex justify-end";
-  const userBubble = document.createElement("div");
-  userBubble.className =
-    "pro-pill rounded-2xl rounded-br-sm px-4 py-2.5 text-sm text-primary max-w-[85%]";
-  userBubble.textContent = text;
-  wrapper.appendChild(userBubble);
-  chatThread.appendChild(wrapper);
+  const row = buildUserMessageRow(text, msgIndex, checkpointSha);
+  chatThread.appendChild(row);
   chatMessages.scrollTop = chatMessages.scrollHeight;
 
   const payload = {
@@ -1547,6 +1645,9 @@ newAgentDialog.addEventListener("close", async () => {
 document.getElementById("btn-save-settings").addEventListener("click", async () => {
   const ollamaUrl = document.getElementById("setting-ollama-url").value.trim();
   const geminiKey = document.getElementById("setting-gemini-key").value.trim();
+  const openaiKey = (document.getElementById("setting-openai-key")?.value || "").trim();
+  const openaiUrl = (document.getElementById("setting-openai-url")?.value || "").trim();
+  const openaiModel = (document.getElementById("setting-openai-model")?.value || "").trim();
   const pinInput = document.getElementById("setting-access-pin");
   const pinToggle = document.getElementById("setting-pin-lock-toggle");
   if (pinInput) {
@@ -1558,6 +1659,9 @@ document.getElementById("btn-save-settings").addEventListener("click", async () 
     body: JSON.stringify({
       ollama_base_url: ollamaUrl,
       gemini_api_key: geminiKey || null,
+      openai_api_key: openaiKey || null,
+      openai_base_url: openaiUrl || null,
+      openai_model: openaiModel || null,
       pin_lock_enabled: pinToggle ? pinToggle.checked : null,
     }),
   });
@@ -1944,15 +2048,9 @@ function renderActiveChatThread(workspaceName) {
   }
 
   if (chatEmptyState) chatEmptyState.classList.add("hidden");
-  chat.messages.forEach((m) => {
+  chat.messages.forEach((m, idx) => {
     if (m.role === "user") {
-      const wrapper = document.createElement("div");
-      wrapper.className = "flex justify-end";
-      const bubble = document.createElement("div");
-      bubble.className = "pro-pill rounded-2xl rounded-br-sm px-4 py-2.5 text-sm text-primary max-w-[85%]";
-      bubble.textContent = m.content;
-      wrapper.appendChild(bubble);
-      chatThread.appendChild(wrapper);
+      chatThread.appendChild(buildUserMessageRow(m.content, idx, m.checkpointSha || null));
     } else {
       const card = document.createElement("div");
       card.className = "space-y-2 py-2";
@@ -1970,7 +2068,7 @@ function renderActiveChatThread(workspaceName) {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-function appendMessageToActiveChat(role, content) {
+function appendMessageToActiveChat(role, content, checkpointSha = null) {
   const ws = state.currentWorkspaceName || "workspace";
   const store = getAllProjectChatsStore();
   store[ws] = store[ws] || [];
@@ -1987,13 +2085,15 @@ function appendMessageToActiveChat(role, content) {
     store[ws].unshift(chat);
     state.activeChatId = chat.id;
   }
-  chat.messages.push({ role, content, ts: Date.now() });
+  const msgIndex = chat.messages.length;
+  chat.messages.push({ role, content, checkpointSha, ts: Date.now() });
   chat.updatedAt = Date.now();
   if (role === "user" && chat.title === "New Chat") {
     chat.title = content.slice(0, 32) + (content.length > 32 ? "..." : "");
   }
   saveAllProjectChatsStore(store);
   renderProjectChatControls(ws);
+  return msgIndex;
 }
 
 if (chatRetentionSelect) {

@@ -570,9 +570,25 @@
               </div>
               <div>
                 <label class="block text-[11px] font-medium text-secondary mb-1">
-                  Cloud AI API Key
+                  Primary Cloud AI API Key
                 </label>
-                <input id="setting-gemini-key" type="password" placeholder="Paste your Cloud AI API key..."
+                <input id="setting-gemini-key" type="password" placeholder="Paste your primary Cloud AI API key..."
+                  class="w-full pro-input text-xs font-mono rounded-xl px-3 py-2" />
+              </div>
+
+              <!-- Backup OpenAI / Free OpenRouter / Free Groq Failover Config -->
+              <div class="pt-2 border-t pro-border space-y-2">
+                <div class="flex flex-wrap items-center justify-between gap-1 text-[11px]">
+                  <span class="font-semibold text-primary">🛡️ Backup OpenAI-Compatible Failover (OpenAI / Free Groq / Free OpenRouter)</span>
+                  <span class="text-tertiary">Auto-activates if primary cloud hits 503</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input id="setting-openai-url" type="text" value="https://api.openai.com/v1" placeholder="https://api.groq.com/openai/v1 or OpenRouter"
+                    class="w-full pro-input text-xs font-mono rounded-xl px-3 py-2" />
+                  <input id="setting-openai-model" type="text" value="gpt-4o-mini" placeholder="gpt-4o-mini or llama-3.3-70b-versatile"
+                    class="w-full pro-input text-xs font-mono rounded-xl px-3 py-2" />
+                </div>
+                <input id="setting-openai-key" type="password" placeholder="Paste OpenAI (sk-...), Groq (gsk_...), or OpenRouter (sk-or-...) API key..."
                   class="w-full pro-input text-xs font-mono rounded-xl px-3 py-2" />
               </div>
               <div>
@@ -704,6 +720,7 @@
             <select id="new-agent-provider" class="w-full pro-input text-xs font-medium rounded-xl px-3 py-2">
               <option value="ollama">Local AI (Ollama)</option>
               <option value="cloud">Cloud AI (+Subagents)</option>
+              <option value="openai">OpenAI / Groq / OpenRouter</option>
               <option value="litert">On-Device AI</option>
             </select>
           </div>
