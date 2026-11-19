@@ -20,6 +20,7 @@ const state = {
   currentFileDiff: "",
   showingDiff: false,
   activeTurnCard: null,
+  isGenerating: false,
   accessPin: localStorage.getItem("agy_access_pin") || "",
   githubToken: localStorage.getItem("agy_github_token") || "",
   pinRequiredByServer: false,
@@ -50,6 +51,7 @@ const chatThread = document.getElementById("chat-thread");
 const chatEmptyState = document.getElementById("chat-empty-state");
 const chatForm = document.getElementById("chat-form");
 const chatInput = document.getElementById("chat-input");
+const btnSendChat = document.getElementById("btn-send-chat");
 const chatAgentProviderBadge = document.getElementById("chat-agent-provider-badge");
 const chatAgentRole = document.getElementById("chat-agent-role");
 const chatSubagentCount = document.getElementById("chat-subagent-count");
@@ -431,12 +433,32 @@ function connectWebSocket() {
 
   ws.onclose = (ev) => {
     state.ws = null;
+    setGeneratingState(false);
     if (ev.code === 1008) {
       promptForAccessPin();
       return;
     }
     setTimeout(connectWebSocket, 2500);
   };
+}
+
+const SEND_ARROW_SVG = `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7" /></svg>`;
+const RUNNING_SPINNER_SVG = `<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z"></path></svg>`;
+
+function setGeneratingState(running) {
+  state.isGenerating = Boolean(running);
+  if (btnSendChat) {
+    btnSendChat.disabled = state.isGenerating;
+    btnSendChat.innerHTML = state.isGenerating ? RUNNING_SPINNER_SVG : SEND_ARROW_SVG;
+    if (state.isGenerating) {
+      btnSendChat.classList.add("opacity-60", "cursor-not-allowed");
+    } else {
+      btnSendChat.classList.remove("opacity-60", "cursor-not-allowed");
+    }
+  }
+  document.querySelectorAll(".quick-prompt-btn").forEach((b) => {
+    b.disabled = state.isGenerating;
+  });
 }
 
 function escapeHtml(str) {
@@ -458,6 +480,7 @@ function formatSimpleMarkdown(text) {
 
 function handleStreamEvent(msg) {
   if (msg.type === "turn_start") {
+    setGeneratingState(true);
     if (chatEmptyState) chatEmptyState.classList.add("hidden");
     const card = document.createElement("div");
     card.className = "space-y-2.5 py-2";
@@ -467,6 +490,10 @@ function handleStreamEvent(msg) {
         <img src="/static/ownstack-logo.jpeg" alt="OwnStack" class="w-5 h-5 rounded-md object-cover border pro-border" />
         <span class="font-semibold text-primary">${escapeHtml(msg.agent_name)}</span>
         <span class="font-mono text-tertiary text-[11px]">${escapeHtml(msg.model)}</span>
+        <span class="turn-running-pill inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 text-[10px] font-medium">
+          <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping"></span>
+          <span>Thinking...</span>
+        </span>
       </div>
       <div class="pl-7 space-y-2.5">
         <details class="thought-box hidden bg-elevated border pro-border rounded-xl px-3 py-2 text-[11px] text-secondary">
@@ -481,6 +508,7 @@ function handleStreamEvent(msg) {
     state.activeTurnCard = {
       el: card,
       rawText: "",
+      runningPill: card.querySelector(".turn-running-pill"),
       thoughtBox: card.querySelector(".thought-box"),
       thoughtContent: card.querySelector(".thought-content"),
       toolList: card.querySelector(".tool-list"),
@@ -524,8 +552,17 @@ function handleStreamEvent(msg) {
     state.activeTurnCard.responseContent.innerHTML = formatSimpleMarkdown(state.activeTurnCard.rawText);
     chatMessages.scrollTop = chatMessages.scrollHeight;
   } else if (msg.type === "turn_end") {
+    if (state.activeTurnCard && state.activeTurnCard.runningPill) {
+      state.activeTurnCard.runningPill.remove();
+    }
     state.activeTurnCard = null;
+    setGeneratingState(false);
   } else if (msg.type === "error") {
+    if (state.activeTurnCard && state.activeTurnCard.runningPill) {
+      state.activeTurnCard.runningPill.remove();
+    }
+    state.activeTurnCard = null;
+    setGeneratingState(false);
     const errEl = document.createElement("div");
     errEl.className =
       "bg-rose-500/10 border border-rose-500/30 text-rose-600 text-xs font-medium rounded-xl p-3";
@@ -572,13 +609,14 @@ document.getElementById("btn-review-approval").addEventListener("click", () => {
 // 8. Send Chat Prompt + Enter Key Handler
 function sendChatPrompt(promptText) {
   const text = promptText.trim();
-  if (!text) return;
+  if (!text || state.isGenerating) return;
 
   if (state.pinRequiredByServer && !state.accessPin) {
     promptForAccessPin();
     return;
   }
 
+  setGeneratingState(true);
   if (chatEmptyState) chatEmptyState.classList.add("hidden");
 
   const wrapper = document.createElement("div");
