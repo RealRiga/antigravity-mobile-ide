@@ -132,7 +132,7 @@
         <svg class="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
-        <span id="header-workspace-name" class="repo-obscurable truncate">workspace</span>
+        <span id="header-workspace-name" class="repo-obscurable truncate">Add Repo</span>
       </button>
 
       <button id="btn-toggle-obscure" type="button" title="Hide / Show Repo Names in Public" aria-label="Toggle repo name privacy blur"
@@ -423,18 +423,31 @@
               <div>
                 <div class="flex flex-wrap items-center gap-2">
                   <h2 class="text-sm font-semibold text-primary">GitHub Repositories</h2>
-                  <span id="github-auth-badge" class="text-[10px] font-medium px-2 py-0.5 rounded-full pro-pill text-secondary">Public Only</span>
+                  <span id="github-auth-badge" class="text-[10px] font-medium px-2 py-0.5 rounded-full pro-pill text-secondary">Not Connected</span>
                 </div>
-                <p class="text-xs text-secondary">Click any repository to clone and switch workspaces seamlessly</p>
+                <p class="text-xs text-secondary">Enter your GitHub username, connect a token for private repos, or clone any Git URL</p>
               </div>
               <div class="flex flex-wrap items-center gap-2">
-                <input id="github-username-input" type="text" value="RealRiga" placeholder="GitHub username..."
-                  class="pro-input text-xs font-mono rounded-xl px-3 py-1.5 w-32 sm:w-36" />
+                <input id="github-username-input" type="text" value="" placeholder="Your GitHub username..."
+                  class="pro-input text-xs font-mono rounded-xl px-3 py-1.5 w-40 sm:w-44" />
                 <button id="btn-github-obscure" type="button" class="pro-pill text-xs font-semibold px-3 py-1.5 rounded-xl flex items-center gap-1">
                   <span id="github-obscure-label">👁️ Hide Names</span>
                 </button>
                 <button id="btn-fetch-github-repos" type="button" class="btn-primary-pro text-xs px-3.5 py-1.5 rounded-xl">
                   Load Repos
+                </button>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t pro-border space-y-1.5">
+              <div class="flex flex-wrap items-center justify-between gap-1 text-[11px]">
+                <span class="font-medium text-secondary">🔗 Or Clone Any Repository URL Directly</span>
+              </div>
+              <div class="flex flex-col sm:flex-row gap-2">
+                <input id="github-direct-clone-url" type="text" placeholder="https://github.com/your-username/your-repo.git"
+                  class="flex-1 min-w-0 pro-input text-xs font-mono rounded-xl px-3 py-2" />
+                <button id="btn-github-direct-clone" type="button" class="btn-primary-pro text-xs font-semibold px-3.5 py-2 rounded-xl shrink-0">
+                  Clone &amp; Open
                 </button>
               </div>
             </div>

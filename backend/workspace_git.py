@@ -344,27 +344,29 @@ class WorkspaceGitManager:
         repo_url: str,
         folder_name: Optional[str] = None,
         token: Optional[str] = None,
+        parent_dir: Optional[str] = None,
     ) -> str:
-        """Clones a remote Git repository (public or private with token) into a subfolder of the parent workspace."""
+        """Clones a remote Git repository (public or private with user-supplied token) into the user's session directory."""
         clean_url = repo_url.strip()
         if not clean_url:
             raise ValueError("Repository URL is required.")
-        parent_dir = os.path.dirname(self.workspace_dir)
+        target_parent = os.path.abspath(parent_dir) if parent_dir else os.path.dirname(self.workspace_dir)
+        os.makedirs(target_parent, exist_ok=True)
         inferred = folder_name or os.path.basename(clean_url.rstrip("/")).replace(".git", "")
         safe_folder = "".join(c for c in inferred if c.isalnum() or c in ("-", "_", ".")) or "cloned-repo"
-        target_dir = os.path.join(parent_dir, safe_folder)
+        target_dir = os.path.join(target_parent, safe_folder)
 
         if os.path.isdir(target_dir) and os.path.isdir(os.path.join(target_dir, ".git")):
             return target_dir
 
         auth_url = clean_url
-        gh_token = (token or os.environ.get("GITHUB_TOKEN", "")).strip()
+        gh_token = (token or "").strip()
         if gh_token and clean_url.startswith("https://github.com/"):
             auth_url = clean_url.replace("https://github.com/", f"https://x-access-token:{gh_token}@github.com/")
 
         res = subprocess.run(
             ["git", "clone", auth_url, target_dir],
-            cwd=parent_dir,
+            cwd=target_parent,
             capture_output=True,
             text=True,
             timeout=60,

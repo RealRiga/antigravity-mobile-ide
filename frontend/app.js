@@ -7,7 +7,23 @@
  * - 1-Click GitHub Repository Browser & Seamless Workspace Switcher
  */
 
+function getOrCreateSessionId() {
+  try {
+    let sid = localStorage.getItem("ownstack_session_id");
+    if (!sid || !/^[a-zA-Z0-9_-]{8,64}$/.test(sid)) {
+      sid = (window.crypto && crypto.randomUUID)
+        ? `u_${crypto.randomUUID().replace(/-/g, "")}`
+        : `u_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+      localStorage.setItem("ownstack_session_id", sid);
+    }
+    return sid;
+  } catch (e) {
+    return `u_${Date.now().toString(36)}`;
+  }
+}
+
 const state = {
+  sessionId: getOrCreateSessionId(),
   agents: [],
   activeAgentId: "cloud-lead-architect",
   lastOllamaAgentId: "ollama-coder",
@@ -23,10 +39,12 @@ const state = {
   isGenerating: false,
   activeTab: "chat",
   currentWorkspaceName: "workspace",
+  hasRepo: false,
   activeChatId: null,
   chatRetention: localStorage.getItem("ownstack_chat_retention") || "7d",
   obscureRepos: localStorage.getItem("agy_obscure_repos") === "true",
   accessPin: localStorage.getItem("agy_access_pin") || "",
+  githubUsername: localStorage.getItem("ownstack_github_username") || "",
   githubToken: localStorage.getItem("agy_github_token") || "",
   pinRequiredByServer: false,
 };
@@ -158,10 +176,13 @@ function askConfirmation({
   });
 }
 
-// 1. Intercept fetch to attach X-AGY-PIN and automatically open PIN dialog on 401 Unauthorized
+// 1. Intercept fetch to attach X-Session-ID & X-AGY-PIN and automatically open PIN dialog on 401 Unauthorized
 const origFetch = window.fetch.bind(window);
 window.fetch = async (url, options = {}) => {
   const headers = new Headers(options.headers || {});
+  if (state.sessionId) {
+    headers.set("X-Session-ID", state.sessionId);
+  }
   if (state.accessPin) {
     headers.set("X-AGY-PIN", state.accessPin);
   }
@@ -418,6 +439,10 @@ if (btnActiveRepoPill) {
 // 6. Initialize Health, PIN Requirement Check, Agents & WebSocket
 async function initApp() {
   setAccessPin(state.accessPin);
+  const ghUserInput = document.getElementById("github-username-input");
+  if (ghUserInput && state.githubUsername) {
+    ghUserInput.value = state.githubUsername;
+  }
   const ghTokenInput = document.getElementById("github-token-input");
   if (ghTokenInput && state.githubToken) {
     ghTokenInput.value = state.githubToken;
@@ -443,13 +468,14 @@ async function refreshHealth() {
     const res = await fetch("/api/health");
     if (!res.ok) return;
     const data = await res.json();
-    if (data.workspace_dir && headerWorkspaceName) {
-      const parts = data.workspace_dir.split("/").filter(Boolean);
-      const wsName = parts[parts.length - 1] || "workspace";
+    state.hasRepo = Boolean(data.has_repo);
+    if (headerWorkspaceName) {
+      const wsName = data.has_repo && data.workspace_name ? data.workspace_name : "Add Repo";
       headerWorkspaceName.textContent = wsName;
-      if (state.currentWorkspaceName !== wsName) {
-        state.currentWorkspaceName = wsName;
-        loadProjectChats(wsName);
+      const chatKey = data.has_repo && data.workspace_name ? data.workspace_name : "workspace";
+      if (state.currentWorkspaceName !== chatKey) {
+        state.currentWorkspaceName = chatKey;
+        loadProjectChats(chatKey);
       }
     }
     const pinToggle = document.getElementById("setting-pin-lock-toggle");
@@ -539,8 +565,11 @@ function connectWebSocket() {
     return;
   }
   const proto = window.location.protocol === "https:" ? "wss" : "ws";
-  const pinQuery = state.accessPin ? `?pin=${encodeURIComponent(state.accessPin)}` : "";
-  const ws = new WebSocket(`${proto}://${window.location.host}/ws/chat${pinQuery}`);
+  const wsParams = new URLSearchParams();
+  if (state.sessionId) wsParams.set("session_id", state.sessionId);
+  if (state.accessPin) wsParams.set("pin", state.accessPin);
+  const qs = wsParams.toString() ? `?${wsParams.toString()}` : "";
+  const ws = new WebSocket(`${proto}://${window.location.host}/ws/chat${qs}`);
   state.ws = ws;
 
   ws.onopen = () => {
@@ -1011,7 +1040,17 @@ async function loadLocalWorkspaces() {
   const data = await res.json();
   container.innerHTML = "";
 
-  (data.workspaces || []).forEach((ws) => {
+  const workspaces = data.workspaces || [];
+  if (workspaces.length === 0) {
+    container.innerHTML = `
+      <div class="pro-card rounded-2xl p-4 col-span-1 sm:col-span-2 text-xs text-secondary">
+        No repositories cloned in your workspace yet. Enter your GitHub username, connect a token, or paste a Git URL above to add your own repository.
+      </div>
+    `;
+    return;
+  }
+
+  workspaces.forEach((ws) => {
     const card = document.createElement("div");
     card.className = "pro-card rounded-2xl p-3.5 flex items-center justify-between gap-2";
     card.innerHTML = `
@@ -1129,9 +1168,17 @@ async function loadGitHubRepos() {
   const userEl = document.getElementById("github-username-input");
   const tokenEl = document.getElementById("github-token-input");
   const authBadge = document.getElementById("github-auth-badge");
+  const countBadge = document.getElementById("github-repo-count");
   const searchEl = document.getElementById("github-repo-search");
-  const username = (userEl ? userEl.value.trim() : "RealRiga") || "RealRiga";
+  const username = (userEl ? userEl.value.trim().replace(/^@/, "") : "");
   const token = (tokenEl ? tokenEl.value.trim() : "") || state.githubToken;
+
+  if (username) {
+    state.githubUsername = username;
+    try {
+      localStorage.setItem("ownstack_github_username", username);
+    } catch (e) {}
+  }
   if (token) {
     state.githubToken = token;
     try {
@@ -1139,7 +1186,26 @@ async function loadGitHubRepos() {
     } catch (e) {}
   }
 
-  grid.innerHTML = `<div class="text-xs text-tertiary col-span-2">Loading all GitHub repositories for @${escapeHtml(username)}...</div>`;
+  // Never load a hardcoded owner profile — prompt new visitors to add their own GitHub username, token, or repo URL
+  if (!username && !token) {
+    state.loadedGitHubRepos = [];
+    if (countBadge) countBadge.textContent = "";
+    if (authBadge) {
+      authBadge.textContent = "Not Connected";
+      authBadge.className = "text-[10px] font-medium px-2 py-0.5 rounded-full pro-pill text-secondary";
+    }
+    grid.innerHTML = `
+      <div class="pro-card rounded-2xl p-5 col-span-1 sm:col-span-2 space-y-2 text-center">
+        <div class="text-sm font-semibold text-primary">Connect Your Own GitHub Repository</div>
+        <p class="text-xs text-secondary max-w-md mx-auto leading-relaxed">
+          Enter your <strong>GitHub username</strong> above and tap <strong>Load Repos</strong> for public repositories, paste a <strong>GitHub Token</strong> to access your private repos, or paste any <strong>Git URL</strong> to clone directly into your private session workspace.
+        </p>
+      </div>
+    `;
+    return;
+  }
+
+  grid.innerHTML = `<div class="text-xs text-tertiary col-span-2">Loading GitHub repositories${username ? ` for @${escapeHtml(username)}` : ""}...</div>`;
   // Pass GitHub token strictly via X-GitHub-Token header (never in URL query string!)
   const url = `/api/github/repos?username=${encodeURIComponent(username)}`;
   const reqHeaders = {};
@@ -1149,6 +1215,13 @@ async function loadGitHubRepos() {
   const res = await fetch(url, { headers: reqHeaders });
   if (!res.ok) return;
   const data = await res.json();
+
+  if (data.error) {
+    state.loadedGitHubRepos = [];
+    if (countBadge) countBadge.textContent = "";
+    grid.innerHTML = `<div class="bg-rose-500/10 border border-rose-500/30 text-rose-600 text-xs rounded-2xl p-4 col-span-1 sm:col-span-2">${escapeHtml(data.error)}</div>`;
+    return;
+  }
 
   if (authBadge) {
     if (data.authenticated) {
@@ -1182,6 +1255,40 @@ if (btnSaveGhToken) {
     withButtonLoader(btnSaveGhToken, "Connecting...", loadGitHubRepos)
   );
 }
+const btnDirectClone = document.getElementById("btn-github-direct-clone");
+if (btnDirectClone) {
+  btnDirectClone.addEventListener("click", async () => {
+    const urlInput = document.getElementById("github-direct-clone-url");
+    const repoUrl = urlInput ? urlInput.value.trim() : "";
+    if (!repoUrl) {
+      alert("Please paste a Git repository URL (e.g. https://github.com/user/repo.git)");
+      return;
+    }
+    await withButtonLoader(btnDirectClone, "Cloning...", async () => {
+      const reqHeaders = { "Content-Type": "application/json" };
+      if (state.githubToken) {
+        reqHeaders["X-GitHub-Token"] = state.githubToken;
+      }
+      const res = await fetch("/api/git/clone", {
+        method: "POST",
+        headers: reqHeaders,
+        body: JSON.stringify({
+          repo_url: repoUrl,
+          token: state.githubToken || null,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (urlInput) urlInput.value = "";
+        await refreshHealth();
+        await loadLocalWorkspaces();
+        activateTab("files");
+      } else {
+        alert(data.detail || "Could not clone repository");
+      }
+    });
+  });
+}
 
 // 10. File Explorer, Editor & Diff Viewer (GitHub-Style Folder Tree + Breadcrumb Navigation)
 state.allWorkspaceFiles = [];
@@ -1196,7 +1303,25 @@ async function loadFileTree(targetDir = state.currentExplorerDir) {
   const res = await fetch("/api/files");
   if (!res.ok) return;
   const data = await res.json();
+  state.hasRepo = Boolean(data.has_repo);
   state.allWorkspaceFiles = data.files || [];
+  if (!data.has_repo && state.allWorkspaceFiles.length === 0) {
+    const pane = document.getElementById("file-tree-pane");
+    if (pane) {
+      pane.innerHTML = `
+        <div class="pro-card rounded-2xl p-4 space-y-2.5 text-center my-2">
+          <div class="text-xs font-semibold text-primary">No Repository Connected</div>
+          <p class="text-[11px] text-secondary leading-relaxed">Add your own GitHub repository to browse and edit files here.</p>
+          <button type="button" id="btn-explorer-add-repo" class="btn-primary-pro text-xs px-3.5 py-1.5 rounded-xl">
+            Add GitHub Repo →
+          </button>
+        </div>
+      `;
+      const addBtn = document.getElementById("btn-explorer-add-repo");
+      if (addBtn) addBtn.addEventListener("click", () => activateTab("github"));
+    }
+    return;
+  }
   renderExplorerDirectory(targetDir);
 }
 
@@ -1407,7 +1532,8 @@ async function openFileInEditor(path) {
     if (imgViewer && imgPreview) {
       imgViewer.classList.remove("hidden");
       const pinParam = state.accessPin ? `&pin=${encodeURIComponent(state.accessPin)}` : "";
-      imgPreview.src = `/api/files/raw?path=${encodeURIComponent(path)}${pinParam}`;
+      const sessionParam = state.sessionId ? `&session_id=${encodeURIComponent(state.sessionId)}` : "";
+      imgPreview.src = `/api/files/raw?path=${encodeURIComponent(path)}${sessionParam}${pinParam}`;
       if (imgMeta) imgMeta.textContent = path;
     }
     return;
