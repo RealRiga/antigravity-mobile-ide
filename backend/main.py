@@ -18,6 +18,7 @@ import json
 import os
 from typing import Any, Dict, List, Optional
 
+import httpx
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -70,9 +71,78 @@ async def pin_auth_middleware(request: Request, call_next):
 
 @app.get("/health")
 @app.get("/ping")
-async def public_cron_health() -> Dict[str, str]:
+async def public_cron_health() -> Dict[str, Any]:
     """Lightweight public health check for Render & external cron jobs (cron-job.org, UptimeRobot)."""
-    return {"status": "awake", "service": "antigravity-mobile-ide"}
+    active_pin = os.environ.get("AGY_ACCESS_PIN", "").strip()
+    return {
+        "status": "awake",
+        "service": "ownstack-antigravity-ide",
+        "pin_required": bool(active_pin),
+    }
+
+
+@app.get("/api/github/repos")
+async def list_github_repos(username: str = "RealRiga", token: Optional[str] = None) -> Dict[str, Any]:
+    """Fetches GitHub repositories for a user (or authenticated token) so the user can 1-click switch workspaces."""
+    clean_user = username.strip() or "RealRiga"
+    gh_token = (token or os.environ.get("GITHUB_TOKEN", "")).strip()
+    headers = {"Accept": "application/vnd.github+json", "User-Agent": "OwnStack-Antigravity-IDE"}
+    if gh_token:
+        headers["Authorization"] = f"Bearer {gh_token}"
+        url = "https://api.github.com/user/repos?sort=updated&per_page=30"
+    else:
+        url = f"https://api.github.com/users/{clean_user}/repos?sort=updated&per_page=30"
+
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code != 200:
+                return {"repos": [], "error": f"GitHub API returned {resp.status_code}"}
+            raw_repos = resp.json()
+            repos = [
+                {
+                    "name": r.get("name"),
+                    "full_name": r.get("full_name"),
+                    "description": r.get("description") or "No description",
+                    "clone_url": r.get("clone_url"),
+                    "html_url": r.get("html_url"),
+                    "language": r.get("language") or "Code",
+                    "updated_at": r.get("updated_at", "")[:10],
+                    "private": bool(r.get("private", False)),
+                }
+                for r in raw_repos
+                if isinstance(r, dict)
+            ]
+            return {
+                "username": clean_user,
+                "active_workspace": os.path.basename(git_manager.workspace_dir),
+                "repos": repos,
+            }
+    except Exception as exc:
+        return {"repos": [], "error": str(exc)}
+
+
+@app.get("/api/workspaces")
+async def list_local_workspaces() -> Dict[str, Any]:
+    """Lists already cloned or local project folders in the parent directory for instant switching."""
+    parent_dir = os.path.dirname(git_manager.workspace_dir)
+    workspaces: List[Dict[str, Any]] = []
+    if os.path.isdir(parent_dir):
+        for entry in sorted(os.listdir(parent_dir)):
+            full = os.path.join(parent_dir, entry)
+            if os.path.isdir(full) and not entry.startswith("."):
+                workspaces.append(
+                    {
+                        "name": entry,
+                        "path": full,
+                        "active": os.path.abspath(full) == os.path.abspath(git_manager.workspace_dir),
+                        "is_git": os.path.isdir(os.path.join(full, ".git")),
+                    }
+                )
+    return {
+        "active_workspace": git_manager.workspace_dir,
+        "workspaces": workspaces,
+    }
 
 orchestrator = MultiAgentOrchestrator(workspace_dir=WORKSPACE_DIR)
 git_manager = WorkspaceGitManager(workspace_dir=WORKSPACE_DIR)

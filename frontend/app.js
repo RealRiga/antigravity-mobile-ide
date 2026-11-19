@@ -1,9 +1,10 @@
 /**
- * Antigravity Mobile IDE — Professional Frontend Controller
- * - Dedicated Welcome / Get Started landing page with engine selector
- * - Pure white default theme with SVG sun/moon dark mode toggle (`dark-mode-toggle`)
- * - 1-tap Ollama <-> Gemini segmented control
- * - ChatGPT / Claude / Gemini inspired floating composer & thread stream
+ * OwnStack — Antigravity Multi-Agent IDE Frontend Controller
+ * - OwnStack Branding & Favicon
+ * - Automatic Access PIN Modal (Prompts whenever server requires AGY_ACCESS_PIN or returns 401/1008)
+ * - Left IDE Sidebar Navigation (Chat, Explorer & Diff, GitHub Repos, Source Control, Agents)
+ * - Enter-to-send keyboard support (Shift+Enter for new line)
+ * - 1-Click GitHub Repository Browser & Seamless Workspace Switcher
  */
 
 const state = {
@@ -13,21 +14,15 @@ const state = {
   lastGeminiAgentId: "gemini-lead-architect",
   welcomeEngine: "gemini",
   ws: null,
+  pendingChatQueue: [],
   currentApprovalId: null,
   currentFilePath: null,
   currentFileDiff: "",
   showingDiff: false,
   activeTurnCard: null,
   accessPin: localStorage.getItem("agy_access_pin") || "",
-};
-
-const origFetch = window.fetch.bind(window);
-window.fetch = (url, options = {}) => {
-  const headers = new Headers(options.headers || {});
-  if (state.accessPin) {
-    headers.set("X-AGY-PIN", state.accessPin);
-  }
-  return origFetch(url, { ...options, headers });
+  githubToken: localStorage.getItem("agy_github_token") || "",
+  pinRequiredByServer: false,
 };
 
 // DOM References
@@ -36,10 +31,20 @@ const btnGetStarted = document.getElementById("btn-get-started");
 const btnShowWelcome = document.getElementById("btn-show-welcome");
 const welcomePickGemini = document.getElementById("welcome-pick-gemini");
 const welcomePickOllama = document.getElementById("welcome-pick-ollama");
+const welcomePinBox = document.getElementById("welcome-pin-box");
+const welcomePinInput = document.getElementById("welcome-pin-input");
+const btnWelcomePin = document.getElementById("btn-welcome-pin");
+
+const pinDialog = document.getElementById("pin-dialog");
+const modalPinInput = document.getElementById("modal-pin-input");
+const btnOpenPinModal = document.getElementById("btn-open-pin-modal");
+const btnCancelPin = document.getElementById("btn-cancel-pin");
+
+const headerWorkspaceName = document.getElementById("header-workspace-name");
+const btnActiveRepoPill = document.getElementById("btn-active-repo-pill");
 
 const activeAgentSelect = document.getElementById("active-agent-select");
 const ollamaStatusPill = document.getElementById("ollama-status-pill");
-const sdkBadge = document.getElementById("sdk-badge");
 const chatMessages = document.getElementById("chat-messages");
 const chatThread = document.getElementById("chat-thread");
 const chatEmptyState = document.getElementById("chat-empty-state");
@@ -63,7 +68,81 @@ const approvalToolArgs = document.getElementById("approval-tool-args");
 
 const newAgentDialog = document.getElementById("new-agent-dialog");
 
-// 1. Welcome Page / Get Started Onboarding Flow
+// 1. Intercept fetch to attach X-AGY-PIN and automatically open PIN dialog on 401 Unauthorized
+const origFetch = window.fetch.bind(window);
+window.fetch = async (url, options = {}) => {
+  const headers = new Headers(options.headers || {});
+  if (state.accessPin) {
+    headers.set("X-AGY-PIN", state.accessPin);
+  }
+  const response = await origFetch(url, { ...options, headers });
+  if (response.status === 401 && !String(url).includes("/health")) {
+    promptForAccessPin();
+  }
+  return response;
+};
+
+function setAccessPin(newPin) {
+  state.accessPin = (newPin || "").trim();
+  try {
+    localStorage.setItem("agy_access_pin", state.accessPin);
+  } catch (e) {}
+  const settingPin = document.getElementById("setting-access-pin");
+  if (settingPin) settingPin.value = state.accessPin;
+  if (welcomePinInput) welcomePinInput.value = state.accessPin;
+  if (modalPinInput) modalPinInput.value = state.accessPin;
+}
+
+function promptForAccessPin() {
+  if (welcomeScreen && !welcomeScreen.classList.contains("hidden")) {
+    if (welcomePinBox) welcomePinBox.classList.remove("hidden");
+    if (welcomePinInput) welcomePinInput.focus();
+    return;
+  }
+  if (pinDialog && !pinDialog.open) {
+    if (modalPinInput) modalPinInput.value = state.accessPin;
+    pinDialog.showModal();
+  }
+}
+
+if (btnOpenPinModal) {
+  btnOpenPinModal.addEventListener("click", () => {
+    if (modalPinInput) modalPinInput.value = state.accessPin;
+    if (!pinDialog.open) pinDialog.showModal();
+  });
+}
+
+if (btnWelcomePin) {
+  btnWelcomePin.addEventListener("click", () => {
+    if (welcomePinBox) {
+      welcomePinBox.classList.remove("hidden");
+      if (welcomePinInput) welcomePinInput.focus();
+    }
+  });
+}
+
+if (btnCancelPin) {
+  btnCancelPin.addEventListener("click", () => {
+    pinDialog.close("cancel");
+  });
+}
+
+if (pinDialog) {
+  pinDialog.addEventListener("close", async () => {
+    const action = pinDialog.returnValue;
+    pinDialog.returnValue = "";
+    if (action !== "unlock") return;
+    if (modalPinInput && modalPinInput.value.trim()) {
+      setAccessPin(modalPinInput.value.trim());
+      if (state.ws) state.ws.close();
+      await refreshHealth();
+      await loadAgents();
+      connectWebSocket();
+    }
+  });
+}
+
+// 2. Welcome Page / Get Started Onboarding Flow
 if (localStorage.getItem("agy_onboarded") === "true") {
   welcomeScreen.classList.add("hidden");
 }
@@ -80,17 +159,23 @@ welcomePickOllama.addEventListener("click", () => {
   welcomePickGemini.classList.remove("ring-2", "ring-indigo-500/80");
 });
 
-btnGetStarted.addEventListener("click", () => {
+btnGetStarted.addEventListener("click", async () => {
+  if (welcomePinInput && welcomePinInput.value.trim()) {
+    setAccessPin(welcomePinInput.value.trim());
+  }
   localStorage.setItem("agy_onboarded", "true");
   welcomeScreen.classList.add("hidden");
+  await refreshHealth();
+  await loadAgents();
   switchEngineProvider(state.welcomeEngine);
+  connectWebSocket();
 });
 
 btnShowWelcome.addEventListener("click", () => {
   welcomeScreen.classList.remove("hidden");
 });
 
-// 2. White Default <-> Dark Mode Theme Toggle (`dark-mode-toggle` compliant)
+// 3. White Default <-> Dark Mode Theme Toggle (`dark-mode-toggle` compliant)
 const SUN_PATH = "M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z";
 const MOON_PATH = "M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z";
 
@@ -135,7 +220,7 @@ window.addEventListener("storage", (e) => {
   }
 });
 
-// 3. Segmented Ollama <-> Gemini Engine Switcher
+// 4. Segmented Ollama <-> Gemini Engine Switcher
 function switchEngineProvider(targetProvider) {
   const matching = state.agents.filter((a) => a.provider === targetProvider);
   if (matching.length === 0) return;
@@ -174,38 +259,65 @@ if (newAgentProviderSelect && newAgentModelInput) {
   });
 }
 
-// 4. Bottom Tab Navigation
-document.querySelectorAll(".nav-tab-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const targetTab = btn.dataset.tab;
-    document.querySelectorAll(".nav-tab-btn").forEach((b) => {
-      b.classList.remove("text-primary", "font-semibold");
-      b.classList.add("text-tertiary");
-    });
-    btn.classList.add("text-primary", "font-semibold");
-    btn.classList.remove("text-tertiary");
-
-    ["chat", "files", "git", "agents"].forEach((tab) => {
-      const el = document.getElementById(`view-${tab}`);
-      if (tab === targetTab) {
-        el.classList.remove("hidden");
-      } else {
-        el.classList.add("hidden");
-      }
-    });
-
-    if (targetTab === "files") loadFileTree();
-    if (targetTab === "git") loadGitStatus();
-    if (targetTab === "agents") renderAgentsRoster();
+// 5. Left Sidebar Tab Navigation
+function activateTab(targetTab) {
+  document.querySelectorAll(".nav-tab-btn").forEach((b) => {
+    b.classList.remove("text-primary", "bg-zinc-500/10", "font-semibold");
+    b.classList.add("text-secondary");
+    if (b.dataset.tab === targetTab) {
+      b.classList.add("text-primary", "bg-zinc-500/10", "font-semibold");
+      b.classList.remove("text-secondary");
+    }
   });
+
+  ["chat", "files", "github", "git", "agents"].forEach((tab) => {
+    const el = document.getElementById(`view-${tab}`);
+    if (!el) return;
+    if (tab === targetTab) {
+      el.classList.remove("hidden");
+    } else {
+      el.classList.add("hidden");
+    }
+  });
+
+  if (targetTab === "files") loadFileTree();
+  if (targetTab === "github") {
+    loadLocalWorkspaces();
+    loadGitHubRepos();
+  }
+  if (targetTab === "git") loadGitStatus();
+  if (targetTab === "agents") renderAgentsRoster();
+}
+
+document.querySelectorAll(".nav-tab-btn").forEach((btn) => {
+  btn.addEventListener("click", () => activateTab(btn.dataset.tab));
 });
 
-// 5. Initialize Health, Agents & WebSocket
+if (btnActiveRepoPill) {
+  btnActiveRepoPill.addEventListener("click", () => activateTab("github"));
+}
+
+// 6. Initialize Health, PIN Requirement Check, Agents & WebSocket
 async function initApp() {
-  const pinInput = document.getElementById("setting-access-pin");
-  if (pinInput && state.accessPin) {
-    pinInput.value = state.accessPin;
+  setAccessPin(state.accessPin);
+  const ghTokenInput = document.getElementById("github-token-input");
+  if (ghTokenInput && state.githubToken) {
+    ghTokenInput.value = state.githubToken;
   }
+
+  // Check public /health first to see if server requires AGY_ACCESS_PIN
+  try {
+    const pub = await origFetch("/health");
+    const pubData = await pub.json();
+    state.pinRequiredByServer = Boolean(pubData.pin_required);
+    if (state.pinRequiredByServer && !state.accessPin) {
+      if (welcomePinBox) welcomePinBox.classList.remove("hidden");
+      if (welcomeScreen.classList.contains("hidden")) {
+        promptForAccessPin();
+      }
+    }
+  } catch (e) {}
+
   await refreshHealth();
   await loadAgents();
   connectWebSocket();
@@ -214,21 +326,26 @@ async function initApp() {
 async function refreshHealth() {
   try {
     const res = await fetch("/api/health");
+    if (!res.ok) return;
     const data = await res.json();
-    if (sdkBadge) sdkBadge.textContent = data.has_agy_sdk ? "SDK Active" : "Preview";
-    const geminiState = data.has_gemini_key ? "Gemini Connected" : "Gemini Ready";
-    if (data.ollama && data.ollama.online) {
-      ollamaStatusPill.textContent = `Ollama Online (${data.ollama.models.length} models) • ${geminiState}`;
-    } else {
-      ollamaStatusPill.textContent = `${geminiState} • Ollama Standby (Local/Tailscale)`;
+    if (data.workspace_dir && headerWorkspaceName) {
+      const parts = data.workspace_dir.split("/").filter(Boolean);
+      headerWorkspaceName.textContent = parts[parts.length - 1] || "workspace";
     }
-  } catch (err) {
-    ollamaStatusPill.textContent = "Connecting to Antigravity workspace...";
-  }
+    const geminiState = data.has_gemini_key ? "Gemini Ready" : "Gemini";
+    if (ollamaStatusPill) {
+      if (data.ollama && data.ollama.online) {
+        ollamaStatusPill.textContent = `Ollama (${data.ollama.models.length}) • ${geminiState}`;
+      } else {
+        ollamaStatusPill.textContent = `${geminiState} • Ollama Standby`;
+      }
+    }
+  } catch (err) {}
 }
 
 async function loadAgents() {
   const res = await fetch("/api/agents");
+  if (!res.ok) return;
   const data = await res.json();
   state.agents = data.agents || [];
   if (!state.agents.find((a) => a.id === state.activeAgentId) && state.agents.length > 0) {
@@ -240,26 +357,29 @@ async function loadAgents() {
 }
 
 function renderAgentSelect() {
+  if (!activeAgentSelect) return;
   activeAgentSelect.innerHTML = "";
   state.agents.forEach((agent) => {
     const opt = document.createElement("option");
     opt.value = agent.id;
-    opt.textContent = `${agent.name}`;
+    opt.textContent = agent.name;
     if (agent.id === state.activeAgentId) opt.selected = true;
     activeAgentSelect.appendChild(opt);
   });
 }
 
-activeAgentSelect.addEventListener("change", () => {
-  state.activeAgentId = activeAgentSelect.value;
-  const picked = state.agents.find((a) => a.id === state.activeAgentId);
-  if (picked) {
-    if (picked.provider === "ollama") state.lastOllamaAgentId = picked.id;
-    if (picked.provider === "gemini") state.lastGeminiAgentId = picked.id;
-  }
-  updateActiveAgentStrip();
-  renderAgentsRoster();
-});
+if (activeAgentSelect) {
+  activeAgentSelect.addEventListener("change", () => {
+    state.activeAgentId = activeAgentSelect.value;
+    const picked = state.agents.find((a) => a.id === state.activeAgentId);
+    if (picked) {
+      if (picked.provider === "ollama") state.lastOllamaAgentId = picked.id;
+      if (picked.provider === "gemini") state.lastGeminiAgentId = picked.id;
+    }
+    updateActiveAgentStrip();
+    renderAgentsRoster();
+  });
+}
 
 function updateActiveAgentStrip() {
   const agent = state.agents.find((a) => a.id === state.activeAgentId);
@@ -286,20 +406,35 @@ function updateActiveAgentStrip() {
   }
 }
 
-// 6. WebSocket Streaming & Mobile Approval Gates
+// 7. WebSocket Streaming & Mobile Approval Gates
 function connectWebSocket() {
+  if (state.ws && (state.ws.readyState === WebSocket.OPEN || state.ws.readyState === WebSocket.CONNECTING)) {
+    return;
+  }
   const proto = window.location.protocol === "https:" ? "wss" : "ws";
   const pinQuery = state.accessPin ? `?pin=${encodeURIComponent(state.accessPin)}` : "";
   const ws = new WebSocket(`${proto}://${window.location.host}/ws/chat${pinQuery}`);
   state.ws = ws;
+
+  ws.onopen = () => {
+    while (state.pendingChatQueue.length > 0) {
+      const payload = state.pendingChatQueue.shift();
+      ws.send(JSON.stringify(payload));
+    }
+  };
 
   ws.onmessage = (event) => {
     const msg = JSON.parse(event.data);
     handleStreamEvent(msg);
   };
 
-  ws.onclose = () => {
-    setTimeout(connectWebSocket, 2000);
+  ws.onclose = (ev) => {
+    state.ws = null;
+    if (ev.code === 1008) {
+      promptForAccessPin();
+      return;
+    }
+    setTimeout(connectWebSocket, 2500);
   };
 }
 
@@ -328,11 +463,7 @@ function handleStreamEvent(msg) {
     const isOllama = msg.provider === "ollama";
     card.innerHTML = `
       <div class="flex items-center gap-2 text-xs">
-        <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${
-          isOllama ? "bg-emerald-600" : "bg-indigo-600"
-        }">
-          ${isOllama ? "OL" : "GM"}
-        </span>
+        <img src="/static/ownstack-logo.jpeg" alt="OwnStack" class="w-5 h-5 rounded-md object-cover border pro-border" />
         <span class="font-semibold text-primary">${escapeHtml(msg.agent_name)}</span>
         <span class="font-mono text-tertiary text-[11px]">${escapeHtml(msg.model)}</span>
       </div>
@@ -437,10 +568,15 @@ document.getElementById("btn-review-approval").addEventListener("click", () => {
   }
 });
 
-// Send Chat Prompt (ChatGPT / Claude User Pill Style)
+// 8. Send Chat Prompt + Enter Key Handler
 function sendChatPrompt(promptText) {
   const text = promptText.trim();
   if (!text) return;
+
+  if (state.pinRequiredByServer && !state.accessPin) {
+    promptForAccessPin();
+    return;
+  }
 
   if (chatEmptyState) chatEmptyState.classList.add("hidden");
 
@@ -454,14 +590,17 @@ function sendChatPrompt(promptText) {
   chatThread.appendChild(wrapper);
   chatMessages.scrollTop = chatMessages.scrollHeight;
 
+  const payload = {
+    type: "chat",
+    agent_id: state.activeAgentId,
+    prompt: text,
+  };
+
   if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-    state.ws.send(
-      JSON.stringify({
-        type: "chat",
-        agent_id: state.activeAgentId,
-        prompt: text,
-      })
-    );
+    state.ws.send(JSON.stringify(payload));
+  } else {
+    state.pendingChatQueue.push(payload);
+    connectWebSocket();
   }
 }
 
@@ -469,6 +608,17 @@ chatForm.addEventListener("submit", (e) => {
   e.preventDefault();
   sendChatPrompt(chatInput.value);
   chatInput.value = "";
+  chatInput.style.height = "auto";
+});
+
+// Send on Enter (without Shift), allow new line with Shift+Enter
+chatInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    sendChatPrompt(chatInput.value);
+    chatInput.value = "";
+    chatInput.style.height = "auto";
+  }
 });
 
 document.querySelectorAll(".quick-prompt-btn").forEach((btn) => {
@@ -477,9 +627,127 @@ document.querySelectorAll(".quick-prompt-btn").forEach((btn) => {
   });
 });
 
-// 7. File Explorer, Editor & Diff Viewer
+// 9. GitHub Repositories Browser & 1-Click Seamless Workspace Switching
+async function loadLocalWorkspaces() {
+  const container = document.getElementById("local-workspaces-list");
+  if (!container) return;
+  const res = await fetch("/api/workspaces");
+  if (!res.ok) return;
+  const data = await res.json();
+  container.innerHTML = "";
+
+  (data.workspaces || []).forEach((ws) => {
+    const card = document.createElement("div");
+    card.className = "pro-card rounded-2xl p-3.5 flex items-center justify-between gap-2";
+    card.innerHTML = `
+      <div class="min-w-0">
+        <div class="text-xs font-semibold text-primary truncate font-mono">${escapeHtml(ws.name)}</div>
+        <div class="text-[10px] text-tertiary truncate">${escapeHtml(ws.path)}</div>
+      </div>
+      <button type="button" class="text-xs px-3 py-1.5 rounded-full font-semibold shrink-0 ${
+        ws.active ? "btn-primary-pro" : "pro-pill hover:opacity-80"
+      }">
+        ${ws.active ? "Active" : "Switch"}
+      </button>
+    `;
+    card.querySelector("button").addEventListener("click", async () => {
+      await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspace_dir: ws.path }),
+      });
+      await refreshHealth();
+      await loadLocalWorkspaces();
+      activateTab("files");
+    });
+    container.appendChild(card);
+  });
+}
+
+async function loadGitHubRepos() {
+  const grid = document.getElementById("github-repos-grid");
+  if (!grid) return;
+  const userEl = document.getElementById("github-username-input");
+  const tokenEl = document.getElementById("github-token-input");
+  const username = (userEl ? userEl.value.trim() : "RealRiga") || "RealRiga";
+  const token = tokenEl ? tokenEl.value.trim() : "";
+  if (token) {
+    state.githubToken = token;
+    try {
+      localStorage.setItem("agy_github_token", token);
+    } catch (e) {}
+  }
+
+  grid.innerHTML = `<div class="text-xs text-tertiary col-span-2">Loading GitHub repositories for @${escapeHtml(username)}...</div>`;
+  const url = `/api/github/repos?username=${encodeURIComponent(username)}${
+    token ? `&token=${encodeURIComponent(token)}` : ""
+  }`;
+  const res = await fetch(url);
+  if (!res.ok) return;
+  const data = await res.json();
+  grid.innerHTML = "";
+
+  if (!data.repos || data.repos.length === 0) {
+    grid.innerHTML = `<div class="text-xs text-tertiary col-span-2">No repositories found. Check the GitHub username or add a Personal Access Token.</div>`;
+    return;
+  }
+
+  data.repos.forEach((repo) => {
+    const isCurrent = data.active_workspace === repo.name;
+    const card = document.createElement("div");
+    card.className = "pro-card rounded-2xl p-4 flex flex-col justify-between gap-3 hover:border-emerald-500 transition";
+    card.innerHTML = `
+      <div class="space-y-1">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-xs font-semibold text-primary font-mono truncate">${escapeHtml(repo.name)}</span>
+          <span class="text-[10px] px-2 py-0.5 rounded-full pro-pill text-secondary shrink-0">${escapeHtml(repo.language)}</span>
+        </div>
+        <p class="text-[11px] text-secondary line-clamp-2">${escapeHtml(repo.description)}</p>
+      </div>
+      <div class="flex items-center justify-between pt-2 border-t pro-border">
+        <span class="text-[10px] text-tertiary">Updated ${escapeHtml(repo.updated_at)}</span>
+        <button type="button" class="text-xs px-3.5 py-1.5 rounded-full font-semibold ${
+          isCurrent ? "btn-primary-pro" : "pro-pill hover:opacity-80"
+        }">
+          ${isCurrent ? "Active Workspace" : "Open in IDE →"}
+        </button>
+      </div>
+    `;
+    const btn = card.querySelector("button");
+    btn.addEventListener("click", async () => {
+      btn.textContent = "Cloning & Switching...";
+      try {
+        const cloneRes = await fetch("/api/git/clone", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ repo_url: repo.clone_url, folder_name: repo.name }),
+        });
+        const cloneData = await cloneRes.json();
+        if (cloneRes.ok) {
+          await refreshHealth();
+          await loadLocalWorkspaces();
+          activateTab("files");
+        } else {
+          alert(cloneData.detail || "Could not clone repository");
+          btn.textContent = "Open in IDE →";
+        }
+      } catch (e) {
+        btn.textContent = "Open in IDE →";
+      }
+    });
+    grid.appendChild(card);
+  });
+}
+
+const btnFetchGithub = document.getElementById("btn-fetch-github-repos");
+if (btnFetchGithub) {
+  btnFetchGithub.addEventListener("click", loadGitHubRepos);
+}
+
+// 10. File Explorer, Editor & Diff Viewer (Split-Screen on PC, Stack on Mobile)
 async function loadFileTree() {
   const res = await fetch("/api/files");
+  if (!res.ok) return;
   const data = await res.json();
   const pane = document.getElementById("file-tree-pane");
   pane.innerHTML = "";
@@ -488,7 +756,7 @@ async function loadFileTree() {
     const row = document.createElement("button");
     row.type = "button";
     row.className =
-      "w-full text-left pro-card rounded-xl px-3.5 py-2.5 hover:border-indigo-500 flex items-center justify-between gap-2 transition";
+      "w-full text-left pro-card rounded-xl px-3 py-2 hover:border-indigo-500 flex items-center justify-between gap-2 transition";
     row.innerHTML = `
       <div class="min-w-0">
         <div class="text-xs font-mono font-medium text-primary truncate">${escapeHtml(f.path)}</div>
@@ -496,8 +764,8 @@ async function loadFileTree() {
       </div>
       ${
         f.modified
-          ? `<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600">MODIFIED</span>`
-          : `<span class="text-xs text-tertiary">→</span>`
+          ? `<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600">M</span>`
+          : `<span class="text-xs text-tertiary">›</span>`
       }
     `;
     row.addEventListener("click", () => openFileInEditor(f.path));
@@ -507,14 +775,20 @@ async function loadFileTree() {
 
 async function openFileInEditor(path) {
   const res = await fetch(`/api/files/read?path=${encodeURIComponent(path)}`);
+  if (!res.ok) return;
   const data = await res.json();
   state.currentFilePath = data.path;
   state.currentFileDiff = data.diff || "";
   state.showingDiff = false;
 
   document.getElementById("current-file-label").textContent = data.path;
-  document.getElementById("file-tree-pane").classList.add("hidden");
-  document.getElementById("file-editor-pane").classList.remove("hidden");
+  if (window.innerWidth < 1024) {
+    document.getElementById("file-tree-pane").classList.add("hidden");
+  }
+  const editorPane = document.getElementById("file-editor-pane");
+  editorPane.classList.remove("hidden");
+  editorPane.classList.add("flex");
+
   document.getElementById("btn-back-to-tree").classList.remove("hidden");
   document.getElementById("btn-save-file").classList.remove("hidden");
   document.getElementById("btn-toggle-file-diff").classList.remove("hidden");
@@ -528,12 +802,12 @@ async function openFileInEditor(path) {
 }
 
 document.getElementById("btn-back-to-tree").addEventListener("click", () => {
-  document.getElementById("current-file-label").textContent = "Workspace Files";
+  document.getElementById("current-file-label").textContent = "Workspace Explorer";
   document.getElementById("file-tree-pane").classList.remove("hidden");
-  document.getElementById("file-editor-pane").classList.add("hidden");
+  if (window.innerWidth < 1024) {
+    document.getElementById("file-editor-pane").classList.add("hidden");
+  }
   document.getElementById("btn-back-to-tree").classList.add("hidden");
-  document.getElementById("btn-save-file").classList.add("hidden");
-  document.getElementById("btn-toggle-file-diff").classList.add("hidden");
   loadFileTree();
 });
 
@@ -549,7 +823,7 @@ document.getElementById("btn-save-file").addEventListener("click", async () => {
   state.currentFileDiff = data.diff || "";
   const btn = document.getElementById("btn-save-file");
   btn.textContent = "Saved ✓";
-  setTimeout(() => (btn.textContent = "Save"), 1400);
+  setTimeout(() => (btn.textContent = "Save File"), 1400);
 });
 
 document.getElementById("btn-toggle-file-diff").addEventListener("click", () => {
@@ -591,9 +865,10 @@ function renderDiffLines(container, diffText) {
   });
 }
 
-// 8. Git Status, Diff, Commit & Branch Controls
+// 11. Git Status, Diff, Commit & Branch Controls
 async function loadGitStatus() {
   const res = await fetch("/api/git/status");
+  if (!res.ok) return;
   const data = await res.json();
   document.getElementById("git-current-branch").textContent = data.branch || "main";
 
@@ -690,20 +965,22 @@ if (cloneBtn) {
       const data = await res.json();
       if (res.ok) {
         repoInput.value = "";
+        await refreshHealth();
         await loadGitStatus();
         await loadFileTree();
       } else {
         alert(data.detail || "Clone failed");
       }
     } finally {
-      cloneBtn.textContent = "Clone Repo";
+      cloneBtn.textContent = "Clone URL";
     }
   });
 }
 
-// 9. Multi-Agent Roster & Profile Creation
+// 12. Multi-Agent Roster & Profile Creation
 function renderAgentsRoster() {
   const list = document.getElementById("agents-roster-list");
+  if (!list) return;
   list.innerHTML = "";
   state.agents.forEach((a) => {
     const card = document.createElement("div");
@@ -804,8 +1081,7 @@ document.getElementById("btn-save-settings").addEventListener("click", async () 
   const geminiKey = document.getElementById("setting-gemini-key").value.trim();
   const pinInput = document.getElementById("setting-access-pin");
   if (pinInput) {
-    state.accessPin = pinInput.value.trim();
-    localStorage.setItem("agy_access_pin", state.accessPin);
+    setAccessPin(pinInput.value.trim());
   }
   await fetch("/api/settings", {
     method: "POST",
@@ -820,6 +1096,7 @@ document.getElementById("btn-save-settings").addEventListener("click", async () 
   }
   await refreshHealth();
   await loadAgents();
+  connectWebSocket();
 });
 
 document.getElementById("btn-test-ollama").addEventListener("click", async () => {
