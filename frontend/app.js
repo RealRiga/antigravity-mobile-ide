@@ -32,9 +32,6 @@ const btnGetStarted = document.getElementById("btn-get-started");
 const btnShowWelcome = document.getElementById("btn-show-welcome");
 const welcomePickGemini = document.getElementById("welcome-pick-gemini");
 const welcomePickOllama = document.getElementById("welcome-pick-ollama");
-const welcomePinBox = document.getElementById("welcome-pin-box");
-const welcomePinInput = document.getElementById("welcome-pin-input");
-const btnWelcomePin = document.getElementById("btn-welcome-pin");
 
 const pinDialog = document.getElementById("pin-dialog");
 const modalPinInput = document.getElementById("modal-pin-input");
@@ -91,14 +88,12 @@ function setAccessPin(newPin) {
   } catch (e) {}
   const settingPin = document.getElementById("setting-access-pin");
   if (settingPin) settingPin.value = state.accessPin;
-  if (welcomePinInput) welcomePinInput.value = state.accessPin;
   if (modalPinInput) modalPinInput.value = state.accessPin;
 }
 
 function promptForAccessPin() {
+  // Never pop open the PIN modal while the user is still viewing the Welcome Screen
   if (welcomeScreen && !welcomeScreen.classList.contains("hidden")) {
-    if (welcomePinBox) welcomePinBox.classList.remove("hidden");
-    if (welcomePinInput) welcomePinInput.focus();
     return;
   }
   if (pinDialog && !pinDialog.open) {
@@ -111,15 +106,6 @@ if (btnOpenPinModal) {
   btnOpenPinModal.addEventListener("click", () => {
     if (modalPinInput) modalPinInput.value = state.accessPin;
     if (!pinDialog.open) pinDialog.showModal();
-  });
-}
-
-if (btnWelcomePin) {
-  btnWelcomePin.addEventListener("click", () => {
-    if (welcomePinBox) {
-      welcomePinBox.classList.remove("hidden");
-      if (welcomePinInput) welcomePinInput.focus();
-    }
   });
 }
 
@@ -162,11 +148,11 @@ welcomePickOllama.addEventListener("click", () => {
 });
 
 btnGetStarted.addEventListener("click", async () => {
-  if (welcomePinInput && welcomePinInput.value.trim()) {
-    setAccessPin(welcomePinInput.value.trim());
-  }
   localStorage.setItem("agy_onboarded", "true");
   welcomeScreen.classList.add("hidden");
+  if (state.pinRequiredByServer && !state.accessPin) {
+    promptForAccessPin();
+  }
   await refreshHealth();
   await loadAgents();
   switchEngineProvider(state.welcomeEngine);
@@ -177,48 +163,77 @@ btnShowWelcome.addEventListener("click", () => {
   welcomeScreen.classList.remove("hidden");
 });
 
-// 3. White Default <-> Dark Mode Theme Toggle (`dark-mode-toggle` compliant)
+// 3. Default by Device System Theme + Two-State Toggle (`dark-mode-toggle` compliant)
 const SUN_PATH = "M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z";
 const MOON_PATH = "M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z";
+const systemDarkMql = window.matchMedia("(prefers-color-scheme: dark)");
 
-function getCurrentColorScheme() {
+function getRenderedColorScheme() {
   const meta = document.querySelector('meta[name="color-scheme"]');
-  const content = meta ? meta.content : "light";
+  const content = meta ? meta.content : "light dark";
   if (content === "dark" || content === "light") return content;
-  return "light";
+  return systemDarkMql.matches ? "dark" : "light";
 }
 
-function applyColorScheme(scheme) {
-  const meta = document.querySelector('meta[name="color-scheme"]');
-  if (meta) {
-    meta.content = scheme;
-  }
+function syncThemeUI() {
+  const rendered = getRenderedColorScheme();
   const themeMeta = document.querySelector('meta[name="theme-color"]');
   if (themeMeta) {
-    themeMeta.content = scheme === "dark" ? "#0d0d0f" : "#ffffff";
+    themeMeta.content = rendered === "dark" ? "#0d0d0f" : "#ffffff";
   }
-  const iconPath = scheme === "dark" ? SUN_PATH : MOON_PATH;
+  const iconPath = rendered === "dark" ? SUN_PATH : MOON_PATH;
   document.querySelectorAll("#theme-toggle-svg path, #welcome-theme-svg path").forEach((p) => {
     p.setAttribute("d", iconPath);
   });
-  try {
-    localStorage.setItem("color-scheme", scheme);
-  } catch (e) {}
 }
 
-applyColorScheme(getCurrentColorScheme());
+function applyStoredOrSystemScheme(storedValue) {
+  const meta = document.querySelector('meta[name="color-scheme"]');
+  if (meta) {
+    meta.content = (storedValue === "light" || storedValue === "dark") ? storedValue : "light dark";
+  }
+  syncThemeUI();
+}
+
+// Initialize from localStorage (or follow device system default when unset)
+try {
+  applyStoredOrSystemScheme(localStorage.getItem("color-scheme"));
+} catch (e) {
+  applyStoredOrSystemScheme(null);
+}
+
+// Keep icon & theme-color synced if the user's device OS switches light/dark mode
+systemDarkMql.addEventListener("change", () => {
+  syncThemeUI();
+});
 
 function toggleTheme() {
-  const next = getCurrentColorScheme() === "dark" ? "light" : "dark";
-  applyColorScheme(next);
+  const currentRendered = getRenderedColorScheme();
+  const target = currentRendered === "dark" ? "light" : "dark";
+  const systemScheme = systemDarkMql.matches ? "dark" : "light";
+  const meta = document.querySelector('meta[name="color-scheme"]');
+
+  if (target === systemScheme) {
+    // Target matches device system preference -> return to system default ("light dark")
+    try {
+      localStorage.removeItem("color-scheme");
+    } catch (e) {}
+    if (meta) meta.content = "light dark";
+  } else {
+    try {
+      localStorage.setItem("color-scheme", target);
+    } catch (e) {}
+    if (meta) meta.content = target;
+  }
+  syncThemeUI();
 }
 
 btnThemeToggle.addEventListener("click", toggleTheme);
 if (btnWelcomeTheme) btnWelcomeTheme.addEventListener("click", toggleTheme);
 
 window.addEventListener("storage", (e) => {
-  if (e.key === "color-scheme" && e.newValue) {
-    applyColorScheme(e.newValue);
+  if (e.key === "color-scheme") {
+    applyStoredOrSystemScheme(e.newValue);
   }
 });
 
@@ -313,11 +328,8 @@ async function initApp() {
     const pub = await origFetch("/health");
     const pubData = await pub.json();
     state.pinRequiredByServer = Boolean(pubData.pin_required);
-    if (state.pinRequiredByServer && !state.accessPin) {
-      if (welcomePinBox) welcomePinBox.classList.remove("hidden");
-      if (welcomeScreen.classList.contains("hidden")) {
-        promptForAccessPin();
-      }
+    if (state.pinRequiredByServer && !state.accessPin && welcomeScreen.classList.contains("hidden")) {
+      promptForAccessPin();
     }
   } catch (e) {}
 

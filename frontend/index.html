@@ -3,11 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <!-- MANDATORY: Declare support for both light and dark themes; FOUC script defaults to white ("light") -->
+  <!-- MANDATORY: Declare support for both light and dark themes; FOUC script defaults to device system theme ("light dark") -->
   <meta name="color-scheme" content="light dark" />
   <script>
     try {
-      document.querySelector('meta[name="color-scheme"]').content = localStorage.getItem("color-scheme") ?? "light";
+      const saved = localStorage.getItem("color-scheme");
+      document.querySelector('meta[name="color-scheme"]').content =
+        (saved === "light" || saved === "dark") ? saved : "light dark";
     } catch (e) {}
   </script>
   <meta name="theme-color" content="#ffffff" />
@@ -25,22 +27,16 @@
   <!-- ===================================================================== -->
   <div id="welcome-screen" class="fixed inset-0 z-40 bg-canvas flex flex-col justify-between overflow-y-auto px-5 py-6">
     <!-- Top Brand & Theme Bar -->
-    <div class="max-w-3xl w-full mx-auto flex items-center justify-between">
-      <div class="flex items-center gap-2.5">
-        <img src="/static/ownstack-logo.jpeg" alt="OwnStack Logo" class="w-9 h-9 rounded-xl object-cover border pro-border shadow-sm" />
-        <div>
-          <span class="font-bold text-sm text-primary tracking-tight">Own_Stack</span>
-          <span class="text-[11px] font-medium px-2 py-0.5 rounded-full pro-pill text-secondary ml-1.5">Antigravity IDE</span>
+    <div class="max-w-3xl w-full mx-auto flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <img src="/static/ownstack-logo.jpeg" alt="OwnStack Logo" class="w-9 h-9 rounded-xl object-cover border pro-border shadow-sm shrink-0" />
+        <div class="flex items-center gap-1.5 flex-wrap min-w-0">
+          <span class="font-bold text-sm text-primary tracking-tight whitespace-nowrap">Own_Stack</span>
+          <span class="text-[11px] font-medium px-2 py-0.5 rounded-full pro-pill text-secondary whitespace-nowrap">Antigravity IDE</span>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-        <button id="btn-welcome-pin" type="button" class="text-xs pro-pill font-medium px-3 py-1.5 rounded-full flex items-center gap-1.5">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-          </svg>
-          <span>Access PIN</span>
-        </button>
-        <button id="btn-welcome-theme" type="button" aria-label="Toggle Light or Dark theme"
+      <div class="flex items-center gap-2 shrink-0">
+        <button id="btn-welcome-theme" type="button" aria-label="Toggle Light, Dark, or System theme"
           class="w-9 h-9 rounded-full pro-pill flex items-center justify-center hover:opacity-80 transition">
           <svg id="welcome-theme-svg" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
@@ -98,18 +94,6 @@
         </div>
       </div>
 
-      <!-- Optional Quick Access PIN Input right on Welcome Screen if server requires a PIN -->
-      <div id="welcome-pin-box" class="hidden pro-card rounded-2xl p-4 space-y-2 border-amber-500/40">
-        <label class="block text-xs font-semibold text-primary">
-          🔒 Workspace Access PIN Required
-        </label>
-        <p class="text-xs text-secondary">
-          This cloud server is protected by <code>AGY_ACCESS_PIN</code>. Enter your PIN to unlock chat, files, and GitHub switching:
-        </p>
-        <input id="welcome-pin-input" type="password" placeholder="Enter your AGY_ACCESS_PIN..."
-          class="w-full pro-input text-xs font-mono rounded-xl px-3.5 py-2.5" />
-      </div>
-
       <!-- Primary Get Started CTA + Read Documentation Button -->
       <div class="pt-1 flex flex-col sm:flex-row gap-2.5">
         <button id="btn-get-started" type="button"
@@ -139,11 +123,11 @@
   </div>
 
   <!-- ===================================================================== -->
-  <!-- TOP HEADER BAR (OwnStack Logo + Active Repo + Engine Toggle + Theme)  -->
+  <!-- TOP HEADER BAR (Responsive Wrap on Mobile + Single Row on Desktop)    -->
   <!-- ===================================================================== -->
-  <header class="shrink-0 bg-canvas border-b pro-border px-3.5 py-2 flex items-center justify-between gap-2 z-20">
+  <header class="shrink-0 bg-canvas border-b pro-border px-3 py-2 flex flex-wrap items-center justify-between gap-2 z-20">
     <!-- Left: OwnStack Logo + Brand Name + Active Repo Badge -->
-    <div class="flex items-center gap-2.5 min-w-0">
+    <div class="flex items-center gap-2 min-w-0">
       <button id="btn-show-welcome" type="button" title="Open Welcome Page"
         class="flex items-center gap-2 shrink-0 hover:opacity-85 transition">
         <img src="/static/ownstack-logo.jpeg" alt="OwnStack" class="w-8 h-8 rounded-xl object-cover border pro-border shadow-sm" />
@@ -154,7 +138,7 @@
 
       <!-- Active Workspace Repo Pill (Clicks to open GitHub Repos view) -->
       <button id="btn-active-repo-pill" type="button" title="Switch GitHub Repository"
-        class="pro-pill px-2.5 py-1 rounded-lg text-xs font-mono font-medium text-primary flex items-center gap-1.5 truncate max-w-[160px] sm:max-w-[240px] hover:border-emerald-500 transition">
+        class="pro-pill px-2.5 py-1 rounded-lg text-xs font-mono font-medium text-primary flex items-center gap-1.5 min-w-0 max-w-[130px] sm:max-w-[220px] hover:border-emerald-500 transition">
         <svg class="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
@@ -163,7 +147,7 @@
     </div>
 
     <!-- Right: 1-Tap Ollama <-> Gemini Switcher + Lock/PIN Button + Theme Toggle -->
-    <div class="flex items-center gap-2 shrink-0">
+    <div class="flex items-center gap-1.5 sm:gap-2 ml-auto">
       <div class="segmented-control" role="group" aria-label="Switch between Ollama and Gemini engine">
         <button id="btn-toggle-ollama" type="button" class="segmented-option">
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
@@ -177,7 +161,7 @@
 
       <!-- Active Agent Profile Modal Trigger -->
       <button id="btn-open-new-agent" type="button" title="Create New Agent Profile"
-        class="pro-pill w-8 h-8 rounded-full flex items-center justify-center text-secondary hover:opacity-80 transition">
+        class="pro-pill w-8 h-8 rounded-full flex items-center justify-center text-secondary hover:opacity-80 transition shrink-0">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
         </svg>
@@ -185,15 +169,15 @@
 
       <!-- Access PIN / Unlock Button -->
       <button id="btn-open-pin-modal" type="button" title="Workspace Access PIN"
-        class="pro-pill w-8 h-8 rounded-full flex items-center justify-center text-secondary hover:opacity-80 transition">
+        class="pro-pill w-8 h-8 rounded-full flex items-center justify-center text-secondary hover:opacity-80 transition shrink-0">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
         </svg>
       </button>
 
-      <!-- Light / Dark Theme Toggle -->
-      <button id="btn-theme-toggle" type="button" title="Toggle White / Dark Mode" aria-label="Toggle Light or Dark color theme"
-        class="pro-pill w-8 h-8 rounded-full flex items-center justify-center text-secondary hover:opacity-80 transition">
+      <!-- Light / Dark / System Theme Toggle -->
+      <button id="btn-theme-toggle" type="button" title="Toggle Light / Dark / Device Theme" aria-label="Toggle color theme"
+        class="pro-pill w-8 h-8 rounded-full flex items-center justify-center text-secondary hover:opacity-80 transition shrink-0">
         <svg id="theme-toggle-svg" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
         </svg>
@@ -280,24 +264,24 @@
       </div>
     </aside>
 
-    <!-- MAIN CONTENT WORKSPACE -->
-    <main class="flex-1 overflow-hidden relative flex flex-col bg-canvas">
+    <!-- MAIN CONTENT WORKSPACE (min-w-0 prevents flex items from overflowing right on mobile!) -->
+    <main class="flex-1 min-w-0 overflow-hidden relative flex flex-col bg-canvas">
 
       <!-- VIEW 1: CONVERSATION CANVAS (ChatGPT / Claude / Gemini Style) -->
-      <section id="view-chat" class="flex-1 flex flex-col h-full overflow-hidden">
-        <div id="chat-messages" class="flex-1 overflow-y-auto px-4 sm:px-8 py-6 select-text">
+      <section id="view-chat" class="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
+        <div id="chat-messages" class="flex-1 overflow-y-auto px-3.5 sm:px-8 py-5 select-text">
           <div class="max-w-3xl mx-auto space-y-5" id="chat-thread">
             <!-- Empty-State Hero -->
-            <div id="chat-empty-state" class="py-8 sm:py-14 text-center space-y-5">
-              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full pro-pill text-xs text-secondary">
-                <img src="/static/ownstack-logo.jpeg" alt="OwnStack" class="w-4 h-4 rounded-md object-cover" />
+            <div id="chat-empty-state" class="py-6 sm:py-12 text-center space-y-4">
+              <div class="inline-flex flex-wrap items-center justify-center gap-1.5 px-3 py-1.5 rounded-2xl pro-pill text-xs text-secondary max-w-full">
+                <img src="/static/ownstack-logo.jpeg" alt="OwnStack" class="w-4 h-4 rounded-md object-cover shrink-0" />
                 <span id="chat-agent-provider-badge" class="font-semibold text-primary">GEMINI</span>
                 <span>•</span>
-                <span id="chat-agent-role" class="truncate">Multi-Agent Coordinator</span>
+                <span id="chat-agent-role" class="truncate max-w-[160px] sm:max-w-none">Multi-Agent Coordinator</span>
                 <span>•</span>
                 <span id="chat-subagent-count" class="text-indigo-600 font-medium">3 Gates</span>
               </div>
-              <h2 class="text-2xl sm:text-3xl font-semibold tracking-tight text-primary">
+              <h2 class="text-2xl sm:text-3xl font-semibold tracking-tight text-primary px-2">
                 What should we build or ship today?
               </h2>
 
@@ -401,19 +385,19 @@
               </div>
             </div>
 
-            <!-- GitHub Personal Access Token for private repos (Visible right in the card!) -->
+            <!-- GitHub Personal Access Token for private repos (Responsive stack on mobile) -->
             <div class="pt-2 border-t pro-border space-y-1.5">
-              <div class="flex items-center justify-between text-[11px]">
-                <span class="font-medium text-secondary">🔑 Unlock Your Private Repositories (GitHub Personal Access Token)</span>
+              <div class="flex flex-wrap items-center justify-between gap-1 text-[11px]">
+                <span class="font-medium text-secondary">🔑 Unlock Private Repositories (GitHub Token)</span>
                 <a href="https://github.com/settings/tokens/new?scopes=repo&description=OwnStack-Antigravity-IDE" target="_blank" rel="noopener"
                   class="underline font-semibold text-indigo-600">
-                  Generate 1-Click Token on GitHub →
+                  Generate 1-Click Token →
                 </a>
               </div>
-              <div class="flex gap-2">
+              <div class="flex flex-col sm:flex-row gap-2">
                 <input id="github-token-input" type="password" placeholder="Paste ghp_... token here to view & clone private repos"
-                  class="flex-1 pro-input text-xs font-mono rounded-xl px-3 py-1.5" />
-                <button id="btn-save-github-token" type="button" class="pro-pill text-xs font-semibold px-3.5 py-1.5 rounded-xl">
+                  class="flex-1 min-w-0 pro-input text-xs font-mono rounded-xl px-3 py-2" />
+                <button id="btn-save-github-token" type="button" class="pro-pill text-xs font-semibold px-3.5 py-2 rounded-xl shrink-0">
                   Connect Private Repos
                 </button>
               </div>
@@ -435,52 +419,55 @@
       </section>
 
       <!-- VIEW 4: GIT SOURCE CONTROL -->
-      <section id="view-git" class="hidden flex-1 overflow-y-auto p-4 sm:p-6">
+      <section id="view-git" class="hidden flex-1 min-w-0 overflow-y-auto p-3.5 sm:p-6">
         <div class="max-w-3xl mx-auto space-y-4">
           <div class="pro-card rounded-2xl p-4 space-y-3">
-            <div class="flex items-center justify-between">
+            <div class="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <span class="text-[11px] font-medium text-tertiary">Current Branch</span>
                 <div class="flex items-center gap-2 mt-0.5">
-                  <span id="git-current-branch" class="text-sm font-semibold text-primary font-mono">main</span>
+                  <span id="git-current-branch" class="text-sm font-semibold text-primary font-mono break-all">main</span>
                 </div>
               </div>
-              <button id="btn-refresh-git" type="button" class="text-xs pro-pill font-medium px-3 py-1.5 rounded-full">
+              <button id="btn-refresh-git" type="button" class="text-xs pro-pill font-medium px-3 py-1.5 rounded-full shrink-0">
                 Refresh
               </button>
             </div>
 
-            <div class="flex gap-2">
+            <!-- Branch Controls: Input wraps on mobile, buttons sit side-by-side below on mobile or inline on desktop -->
+            <div class="flex flex-col sm:flex-row gap-2">
               <input id="git-new-branch-input" type="text" placeholder="Branch name..."
-                class="flex-1 pro-input text-xs rounded-xl px-3 py-2" />
-              <button id="btn-git-checkout" type="button" class="pro-pill text-xs font-medium px-3.5 py-2 rounded-xl">
-                Switch
-              </button>
-              <button id="btn-git-create-branch" type="button" class="btn-primary-pro text-xs px-3.5 py-2 rounded-xl">
-                + Branch
-              </button>
+                class="flex-1 min-w-0 pro-input text-xs rounded-xl px-3 py-2" />
+              <div class="flex gap-2">
+                <button id="btn-git-checkout" type="button" class="flex-1 sm:flex-none pro-pill text-xs font-medium px-3.5 py-2 rounded-xl">
+                  Switch
+                </button>
+                <button id="btn-git-create-branch" type="button" class="flex-1 sm:flex-none btn-primary-pro text-xs px-3.5 py-2 rounded-xl">
+                  + Branch
+                </button>
+              </div>
             </div>
 
-            <div class="flex gap-2 pt-2 border-t pro-border">
+            <div class="flex flex-col sm:flex-row gap-2 pt-2 border-t pro-border">
               <input id="git-clone-url-input" type="text" placeholder="Clone any Git URL (https://github.com/user/repo.git)..."
-                class="flex-1 pro-input text-xs rounded-xl px-3 py-2" />
-              <button id="btn-git-clone" type="button" class="pro-pill text-xs font-semibold px-3.5 py-2 rounded-xl">
+                class="flex-1 min-w-0 pro-input text-xs rounded-xl px-3 py-2" />
+              <button id="btn-git-clone" type="button" class="pro-pill text-xs font-semibold px-3.5 py-2 rounded-xl shrink-0">
                 Clone URL
               </button>
             </div>
           </div>
 
           <div class="pro-card rounded-2xl p-4 space-y-3">
-            <div class="flex items-center justify-between">
+            <div class="flex flex-wrap items-center justify-between gap-2">
               <h2 class="text-xs font-semibold text-primary">Stage &amp; Commit</h2>
-              <button id="btn-git-stage-all" type="button" class="text-[11px] pro-pill font-medium px-2.5 py-1 rounded-full">
+              <button id="btn-git-stage-all" type="button" class="text-[11px] pro-pill font-medium px-2.5 py-1 rounded-full shrink-0">
                 Stage All (-A)
               </button>
             </div>
-            <div class="flex gap-2">
+            <div class="flex flex-col sm:flex-row gap-2">
               <input id="git-commit-msg" type="text" placeholder="Commit message..."
-                class="flex-1 pro-input text-xs rounded-xl px-3 py-2" />
-              <button id="btn-git-commit" type="button" class="btn-primary-pro text-xs px-4 py-2 rounded-xl">
+                class="flex-1 min-w-0 pro-input text-xs rounded-xl px-3 py-2" />
+              <button id="btn-git-commit" type="button" class="btn-primary-pro text-xs px-4 py-2 rounded-xl shrink-0">
                 Commit
               </button>
             </div>
@@ -567,14 +554,14 @@
       </section>
 
       <!-- VIEW 6: IN-APP DOCUMENTATION & ARCHITECTURE GUIDE -->
-      <section id="view-docs" class="hidden flex-1 overflow-y-auto p-4 sm:p-6 select-text">
+      <section id="view-docs" class="hidden flex-1 min-w-0 overflow-y-auto p-3.5 sm:p-6 select-text">
         <div class="max-w-3xl mx-auto space-y-4">
           <div class="pro-card rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 class="text-base font-bold text-primary">OwnStack Antigravity IDE — Documentation</h2>
               <p class="text-xs text-secondary">Architecture, Multi-Agent SDK configs, API key setup, and cloud deployment guide</p>
             </div>
-            <div class="flex items-center gap-2 shrink-0">
+            <div class="flex flex-wrap items-center gap-2">
               <button type="button" id="btn-doc-tab-guide" class="btn-primary-pro text-xs px-3.5 py-1.5 rounded-full">
                 Architecture (DOCS.md)
               </button>
@@ -584,20 +571,24 @@
             </div>
           </div>
 
-          <!-- Instant API Key Fix Banner Inside Docs -->
-          <div class="pro-card rounded-2xl p-4 space-y-2 border-indigo-500/30">
-            <div class="text-xs font-bold text-primary">💡 Quick Tip: Enabling Your Google Cloud / Gemini API Key</div>
-            <p class="text-xs text-secondary leading-relaxed">
-              • If you have an <code>AQ....</code> Vertex Express API key and clicking the Google Console link took you to the general <strong>API Library</strong> page for project <code>dynamic-mobile-ide</code>, click this exact direct link to go straight to the <strong>Vertex AI API</strong> page and click <strong>Enable</strong>:<br/>
-              <a href="https://console.cloud.google.com/apis/library/aiplatform.googleapis.com?project=dynamic-mobile-ide" target="_blank" rel="noopener" class="underline font-semibold text-indigo-600">
-                https://console.cloud.google.com/apis/library/aiplatform.googleapis.com?project=dynamic-mobile-ide
-              </a><br/>
-              • Or, if you want a key that does <strong>not</strong> require enabling Google Cloud Vertex AI or starting the $300 GCP trial, open <a href="https://aistudio.google.com/app/api-keys" target="_blank" rel="noopener" class="underline font-semibold text-indigo-600">Google AI Studio (aistudio.google.com/app/api-keys)</a> and create a standard <code>AIzaSy...</code> key!
+          <!-- Instant API Key Fix Banner Inside Docs (break-all prevents long URLs from overflowing on mobile!) -->
+          <div class="pro-card rounded-2xl p-4 space-y-2 border-indigo-500/30 overflow-hidden">
+            <div class="text-xs font-bold text-primary">💡 Quick Tip: Google AI Studio / Gemini API Key</div>
+            <p class="text-xs text-secondary leading-relaxed break-words">
+              • Both standard <code>AIzaSy...</code> and <code>AQ....</code> keys created in
+              <a href="https://aistudio.google.com/app/api-keys" target="_blank" rel="noopener" class="underline font-semibold text-indigo-600">
+                Google AI Studio
+              </a>
+              work out of the box on the free Gemini API as long as the <strong>Gemini API (Generative Language API)</strong> is enabled on your Google Cloud project.<br/>
+              • Direct API library link:<br/>
+              <a href="https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com" target="_blank" rel="noopener" class="underline font-semibold text-indigo-600 break-all">
+                https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com
+              </a>
             </p>
           </div>
 
           <!-- Rendered Markdown Documentation Content -->
-          <article id="docs-content-box" class="pro-card rounded-2xl p-5 text-xs sm:text-sm text-primary leading-relaxed space-y-3 font-sans overflow-x-auto">
+          <article id="docs-content-box" class="pro-card rounded-2xl p-4 sm:p-5 text-xs sm:text-sm text-primary leading-relaxed space-y-3 font-sans overflow-x-auto break-words">
             Loading documentation...
           </article>
         </div>
