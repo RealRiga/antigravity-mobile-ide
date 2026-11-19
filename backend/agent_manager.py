@@ -542,7 +542,8 @@ class MultiAgentOrchestrator:
                         stream_iter = response.__aiter__()
                         while True:
                             try:
-                                token = await asyncio.wait_for(stream_iter.__anext__(), timeout=12.0)
+                                # Allow up to 45s per chunk (Render free tier cold CPU + tool execution needs >12s)
+                                token = await asyncio.wait_for(stream_iter.__anext__(), timeout=45.0)
                                 chunk = str(token)
                                 full_text.append(chunk)
                                 await emit(
@@ -559,7 +560,7 @@ class MultiAgentOrchestrator:
                         break
                 except Exception as attempt_exc:
                     last_exc = attempt_exc
-                    err_s = str(attempt_exc)
+                    err_s = str(attempt_exc) or attempt_exc.__class__.__name__
                     # If first model had 503 High Demand or Timeout, automatically switch to fast lite model
                     if (
                         idx == 0
@@ -570,7 +571,7 @@ class MultiAgentOrchestrator:
                             {
                                 "type": "thought_delta",
                                 "agent_id": profile.id,
-                                "delta": "Primary model experiencing temporary 503 high demand; switching to fast `gemini-3.1-flash-lite`...\n",
+                                "delta": "Primary model experiencing temporary delay; retrying with fast cloud model...\n",
                             }
                         )
                         continue
@@ -586,7 +587,9 @@ class MultiAgentOrchestrator:
             await emit({"type": "turn_end", "agent_id": profile.id, "content": final_answer})
 
         except Exception as exc:
-            err_msg = str(exc)
+            err_msg = str(exc).strip() or f"{exc.__class__.__name__} (Request timed out on cloud server — please tap Send again)"
+            if isinstance(exc, asyncio.TimeoutError):
+                err_msg = "Request timed out while waiting for the AI model response. Please try sending your message again."
             if "SERVICE_DISABLED" in err_msg or "aiplatform.googleapis.com" in err_msg:
                 import re
                 match = re.search(
@@ -605,10 +608,7 @@ class MultiAgentOrchestrator:
                     prompt,
                     emit,
                     notice=(
-                        f"Your `AQ.` Express API key needs the **Vertex AI API (`aiplatform.googleapis.com`)** enabled on project `{proj_id}` (or `"
-                        f"dynamic-mobile-ide`). Click this direct link and press **Enable**: **{direct_url}** — "
-                        f"OR create a free standard `AIzaSy...` key at **https://aistudio.google.com/app/api-keys** (which works without enabling Vertex AI!). "
-                        f"*(Showing live interactive response below while it activates)*"
+                        f"Your Cloud AI project requires enabling the API once: **{direct_url}**."
                     ),
                 )
                 return
@@ -617,7 +617,7 @@ class MultiAgentOrchestrator:
                 {
                     "type": "error",
                     "agent_id": profile.id,
-                    "message": f"SDK Execution Error: {err_msg}",
+                    "message": f"Agent Error: {err_msg}",
                 }
             )
 

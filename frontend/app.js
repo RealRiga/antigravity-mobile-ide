@@ -22,6 +22,9 @@ const state = {
   activeTurnCard: null,
   isGenerating: false,
   activeTab: "chat",
+  currentWorkspaceName: "workspace",
+  activeChatId: null,
+  chatRetention: localStorage.getItem("ownstack_chat_retention") || "7d",
   obscureRepos: localStorage.getItem("agy_obscure_repos") === "true",
   accessPin: localStorage.getItem("agy_access_pin") || "",
   githubToken: localStorage.getItem("agy_github_token") || "",
@@ -355,7 +358,12 @@ async function refreshHealth() {
     const data = await res.json();
     if (data.workspace_dir && headerWorkspaceName) {
       const parts = data.workspace_dir.split("/").filter(Boolean);
-      headerWorkspaceName.textContent = parts[parts.length - 1] || "workspace";
+      const wsName = parts[parts.length - 1] || "workspace";
+      headerWorkspaceName.textContent = wsName;
+      if (state.currentWorkspaceName !== wsName) {
+        state.currentWorkspaceName = wsName;
+        loadProjectChats(wsName);
+      }
     }
     const cloudState = data.has_gemini_key ? "Cloud AI Ready" : "Cloud AI";
     if (ollamaStatusPill) {
@@ -659,6 +667,9 @@ function handleStreamEvent(msg) {
     if (state.activeTurnCard && state.activeTurnCard.toolStatusLine) {
       state.activeTurnCard.toolStatusLine.classList.add("hidden");
     }
+    if (msg.content) {
+      appendMessageToActiveChat("assistant", msg.content);
+    }
     state.activeTurnCard = null;
     setGeneratingState(false);
   } else if (msg.type === "error") {
@@ -722,6 +733,8 @@ function sendChatPrompt(promptText) {
 
   setGeneratingState(true);
   if (chatEmptyState) chatEmptyState.classList.add("hidden");
+
+  appendMessageToActiveChat("user", text);
 
   const wrapper = document.createElement("div");
   wrapper.className = "flex justify-end";
@@ -1759,4 +1772,223 @@ if (btnGithubObscure) {
   });
 })();
 
+// 16. Per-Project Chat Manager with Configurable Auto-Delete Retention (24h / 7d / 30d / Never)
+const RETENTION_MS = {
+  "24h": 24 * 60 * 60 * 1000,
+  "7d": 7 * 24 * 60 * 60 * 1000,
+  "30d": 30 * 24 * 60 * 60 * 1000,
+  never: Infinity,
+};
+
+const projectChatSelect = document.getElementById("project-chat-select");
+const chatRetentionSelect = document.getElementById("chat-retention-select");
+const btnNewChat = document.getElementById("btn-new-chat");
+const btnPinChat = document.getElementById("btn-pin-chat");
+const btnDeleteChat = document.getElementById("btn-delete-chat");
+
+function getAllProjectChatsStore() {
+  try {
+    return JSON.parse(localStorage.getItem("ownstack_project_chats") || "{}");
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveAllProjectChatsStore(store) {
+  try {
+    localStorage.setItem("ownstack_project_chats", JSON.stringify(store));
+  } catch (e) {}
+}
+
+function purgeExpiredChats(store) {
+  const ttl = RETENTION_MS[state.chatRetention] ?? RETENTION_MS["7d"];
+  if (ttl === Infinity) return store;
+  const now = Date.now();
+  let changed = false;
+  Object.keys(store).forEach((proj) => {
+    const before = store[proj].length;
+    store[proj] = store[proj].filter((chat) => chat.pinned || now - (chat.updatedAt || chat.createdAt) <= ttl);
+    if (store[proj].length !== before) changed = true;
+  });
+  if (changed) saveAllProjectChatsStore(store);
+  return store;
+}
+
+function createFreshChatThread(workspaceName) {
+  const store = purgeExpiredChats(getAllProjectChatsStore());
+  store[workspaceName] = store[workspaceName] || [];
+  const newChat = {
+    id: `chat-${Date.now().toString(36)}`,
+    title: "New Chat",
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    pinned: false,
+    messages: [],
+  };
+  store[workspaceName].unshift(newChat);
+  saveAllProjectChatsStore(store);
+  state.activeChatId = newChat.id;
+  renderProjectChatControls(workspaceName);
+  renderActiveChatThread(workspaceName);
+}
+
+function loadProjectChats(workspaceName) {
+  const store = purgeExpiredChats(getAllProjectChatsStore());
+  const list = store[workspaceName] || [];
+  if (list.length === 0) {
+    createFreshChatThread(workspaceName);
+    return;
+  }
+  if (!list.find((c) => c.id === state.activeChatId)) {
+    state.activeChatId = list[0].id;
+  }
+  renderProjectChatControls(workspaceName);
+  renderActiveChatThread(workspaceName);
+}
+
+function renderProjectChatControls(workspaceName) {
+  if (!projectChatSelect) return;
+  const store = getAllProjectChatsStore();
+  const list = store[workspaceName] || [];
+  projectChatSelect.innerHTML = "";
+  let activeChat = null;
+
+  list.forEach((c) => {
+    const opt = document.createElement("option");
+    opt.value = c.id;
+    const prefix = c.pinned ? "📌 " : "";
+    opt.textContent = `${prefix}${c.title}`;
+    if (c.id === state.activeChatId) {
+      opt.selected = true;
+      activeChat = c;
+    }
+    projectChatSelect.appendChild(opt);
+  });
+
+  if (btnPinChat) {
+    if (activeChat && activeChat.pinned) {
+      btnPinChat.classList.add("ring-2", "ring-emerald-500/70");
+    } else {
+      btnPinChat.classList.remove("ring-2", "ring-emerald-500/70");
+    }
+  }
+}
+
+function renderActiveChatThread(workspaceName) {
+  if (!chatThread) return;
+  const store = getAllProjectChatsStore();
+  const list = store[workspaceName] || [];
+  const chat = list.find((c) => c.id === state.activeChatId);
+
+  // Clear existing rendered messages while preserving #chat-empty-state node
+  Array.from(chatThread.children).forEach((child) => {
+    if (child.id !== "chat-empty-state") child.remove();
+  });
+
+  if (!chat || !chat.messages || chat.messages.length === 0) {
+    if (chatEmptyState) chatEmptyState.classList.remove("hidden");
+    return;
+  }
+
+  if (chatEmptyState) chatEmptyState.classList.add("hidden");
+  chat.messages.forEach((m) => {
+    if (m.role === "user") {
+      const wrapper = document.createElement("div");
+      wrapper.className = "flex justify-end";
+      const bubble = document.createElement("div");
+      bubble.className = "pro-pill rounded-2xl rounded-br-sm px-4 py-2.5 text-sm text-primary max-w-[85%]";
+      bubble.textContent = m.content;
+      wrapper.appendChild(bubble);
+      chatThread.appendChild(wrapper);
+    } else {
+      const card = document.createElement("div");
+      card.className = "space-y-2 py-2";
+      card.innerHTML = `
+        <div class="flex items-center gap-2.5 text-xs">
+          <img src="/static/ownstack-logo.jpeg" alt="OwnStack" class="w-6 h-6 rounded-lg object-cover border pro-border shadow-sm shrink-0" />
+        </div>
+        <div class="pl-8">
+          <div class="text-sm text-primary leading-relaxed">${formatSimpleMarkdown(m.content)}</div>
+        </div>
+      `;
+      chatThread.appendChild(card);
+    }
+  });
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function appendMessageToActiveChat(role, content) {
+  const ws = state.currentWorkspaceName || "workspace";
+  const store = getAllProjectChatsStore();
+  store[ws] = store[ws] || [];
+  let chat = store[ws].find((c) => c.id === state.activeChatId);
+  if (!chat) {
+    chat = {
+      id: `chat-${Date.now().toString(36)}`,
+      title: "New Chat",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      pinned: false,
+      messages: [],
+    };
+    store[ws].unshift(chat);
+    state.activeChatId = chat.id;
+  }
+  chat.messages.push({ role, content, ts: Date.now() });
+  chat.updatedAt = Date.now();
+  if (role === "user" && chat.title === "New Chat") {
+    chat.title = content.slice(0, 32) + (content.length > 32 ? "..." : "");
+  }
+  saveAllProjectChatsStore(store);
+  renderProjectChatControls(ws);
+}
+
+if (chatRetentionSelect) {
+  chatRetentionSelect.value = state.chatRetention;
+  chatRetentionSelect.addEventListener("change", () => {
+    state.chatRetention = chatRetentionSelect.value;
+    try {
+      localStorage.setItem("ownstack_chat_retention", state.chatRetention);
+    } catch (e) {}
+    loadProjectChats(state.currentWorkspaceName);
+  });
+}
+
+if (projectChatSelect) {
+  projectChatSelect.addEventListener("change", () => {
+    state.activeChatId = projectChatSelect.value;
+    renderProjectChatControls(state.currentWorkspaceName);
+    renderActiveChatThread(state.currentWorkspaceName);
+  });
+}
+
+if (btnNewChat) {
+  btnNewChat.addEventListener("click", () => createFreshChatThread(state.currentWorkspaceName));
+}
+
+if (btnPinChat) {
+  btnPinChat.addEventListener("click", () => {
+    const ws = state.currentWorkspaceName;
+    const store = getAllProjectChatsStore();
+    const chat = (store[ws] || []).find((c) => c.id === state.activeChatId);
+    if (chat) {
+      chat.pinned = !chat.pinned;
+      saveAllProjectChatsStore(store);
+      renderProjectChatControls(ws);
+    }
+  });
+}
+
+if (btnDeleteChat) {
+  btnDeleteChat.addEventListener("click", () => {
+    const ws = state.currentWorkspaceName;
+    const store = getAllProjectChatsStore();
+    store[ws] = (store[ws] || []).filter((c) => c.id !== state.activeChatId);
+    saveAllProjectChatsStore(store);
+    state.activeChatId = null;
+    loadProjectChats(ws);
+  });
+}
+
+loadProjectChats(state.currentWorkspaceName);
 initApp();
