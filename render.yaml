@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: antigravity-mobile-ide
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: AGY_ACCESS_PIN
+        sync: false
+      - key: OLLAMA_BASE_URL
+        value: http://localhost:11434
+

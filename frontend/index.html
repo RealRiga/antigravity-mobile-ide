@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <!-- MANDATORY: Declare support for both light and dark themes; FOUC script defaults to white ("light") -->
+  <meta name="color-scheme" content="light dark" />
+  <script>
+    try {
+      document.querySelector('meta[name="color-scheme"]').content = localStorage.getItem("color-scheme") ?? "light";
+    } catch (e) {}
+  </script>
+  <meta name="theme-color" content="#ffffff" />
+  <link rel="manifest" href="/manifest.json" />
+  <title>Antigravity — Mobile AI Coding Workspace</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body class="h-[100dvh] flex flex-col overflow-hidden select-none">
+
+  <!-- ===================================================================== -->
+  <!-- WELCOME / GET STARTED ONBOARDING VIEW (Shown on launch or via header) -->
+  <!-- ===================================================================== -->
+  <div id="welcome-screen" class="fixed inset-0 z-40 bg-canvas flex flex-col justify-between overflow-y-auto px-5 py-6">
+    <!-- Top Brand & Theme Bar -->
+    <div class="max-w-xl w-full mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex items-center justify-center font-bold text-xs tracking-tight shadow-sm">
+          AG
+        </div>
+        <span class="font-semibold text-sm text-primary tracking-tight">Antigravity</span>
+        <span class="text-[11px] font-medium px-2 py-0.5 rounded-full pro-pill text-secondary">MIT Open Source</span>
+      </div>
+      <button id="btn-welcome-theme" type="button" aria-label="Toggle Light or Dark theme"
+        class="w-9 h-9 rounded-full pro-pill flex items-center justify-center hover:opacity-80 transition">
+        <svg id="welcome-theme-svg" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Center Editorial Hero -->
+    <div class="max-w-xl w-full mx-auto my-auto py-8 space-y-6">
+      <div class="space-y-3">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full pro-pill text-xs font-medium text-secondary">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span>Google Antigravity SDK • Multi-Agent Mobile Runtime</span>
+        </div>
+        <h1 class="text-3xl sm:text-4xl font-bold tracking-tight text-primary leading-[1.15]">
+          Ship code from anywhere with autonomous agents.
+        </h1>
+        <p class="text-sm sm:text-base text-secondary leading-relaxed">
+          Orchestrate local <strong>Ollama</strong> models and cloud <strong>Gemini</strong> subagents, review unified diffs, approve sensitive tool gates, and commit to Git from a clean, distraction-free mobile workspace.
+        </p>
+      </div>
+
+      <!-- Choose Starting Engine before Launching -->
+      <div class="space-y-2.5">
+        <span class="block text-xs font-semibold uppercase tracking-wider text-tertiary">Choose Your Default Engine</span>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <!-- Gemini Card -->
+          <button type="button" id="welcome-pick-gemini"
+            class="pro-card text-left rounded-2xl p-4 hover:border-indigo-500 transition flex flex-col justify-between gap-2 ring-2 ring-indigo-500/80">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-primary flex items-center gap-1.5">
+                <svg class="w-4 h-4 text-indigo-500" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2L14.6 9.4L22 12L14.6 14.6L12 22L9.4 14.6L2 12L9.4 9.4L12 2Z" />
+                </svg>
+                Gemini + Subagents
+              </span>
+              <span class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600">Cloud 24/7</span>
+            </div>
+            <p class="text-xs text-secondary leading-normal">
+              Hierarchical multi-agent coordinator with <code class="text-[11px]">code_researcher</code> &amp; <code class="text-[11px]">test_specialist</code>. Works even when your PC is off.
+            </p>
+          </button>
+
+          <!-- Ollama Card -->
+          <button type="button" id="welcome-pick-ollama"
+            class="pro-card text-left rounded-2xl p-4 hover:border-emerald-500 transition flex flex-col justify-between gap-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-primary flex items-center gap-1.5">
+                <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+                Ollama Local Models
+              </span>
+              <span class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600">Local / Custom PC</span>
+            </div>
+            <p class="text-xs text-secondary leading-normal">
+              Connect <code class="text-[11px]">LocalOpenAIAgentConfig</code> to your own Ollama server (<code class="text-[11px]">gemma4:26b</code>, <code class="text-[11px]">qwen2.5-coder</code>, or custom models).
+            </p>
+          </button>
+        </div>
+      </div>
+
+      <!-- Feature Highlights Grid -->
+      <div class="grid grid-cols-3 gap-2.5 pt-1">
+        <div class="pro-card rounded-xl p-3 space-y-1">
+          <div class="text-xs font-semibold text-primary">Approval Gates</div>
+          <p class="text-[11px] text-secondary leading-snug">Approve or reject terminal &amp; file edits on mobile.</p>
+        </div>
+        <div class="pro-card rounded-xl p-3 space-y-1">
+          <div class="text-xs font-semibold text-primary">Code &amp; Diff</div>
+          <p class="text-[11px] text-secondary leading-snug">Inspect syntax &amp; unified git diffs on the go.</p>
+        </div>
+        <div class="pro-card rounded-xl p-3 space-y-1">
+          <div class="text-xs font-semibold text-primary">Git Control</div>
+          <p class="text-[11px] text-secondary leading-snug">Clone repos, switch branches, stage &amp; commit.</p>
+        </div>
+      </div>
+
+      <!-- Primary Get Started CTA -->
+      <div class="pt-2">
+        <button id="btn-get-started" type="button"
+          class="w-full btn-primary-pro rounded-2xl py-3.5 px-6 text-sm font-semibold flex items-center justify-center gap-2 shadow-sm">
+          <span>Get Started</span>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Footer License & GitHub Credit -->
+    <div class="max-w-xl w-full mx-auto flex items-center justify-between text-[11px] text-tertiary border-t pro-border pt-4">
+      <span>MIT Licensed • Built with Google Antigravity SDK</span>
+      <a href="https://github.com/RealRiga/antigravity-mobile-ide" target="_blank" rel="noopener" class="underline hover:opacity-80">
+        GitHub Repository
+      </a>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MAIN WORKSPACE HEADER (ChatGPT / Claude / Gemini Minimalist Top Bar)  -->
+  <!-- ===================================================================== -->
+  <header class="shrink-0 bg-canvas border-b pro-border px-4 py-2.5 flex items-center justify-between gap-2 z-20">
+    <!-- Left: Brand + Model / Profile Selector -->
+    <div class="flex items-center gap-2 min-w-0">
+      <button id="btn-show-welcome" type="button" title="Back to Welcome Page"
+        class="w-8 h-8 rounded-xl bg-zinc-900 text-white flex items-center justify-center font-bold text-xs tracking-tight shrink-0 hover:opacity-90 transition">
+        AG
+      </button>
+
+      <div class="flex items-center gap-1.5 min-w-0">
+        <select id="active-agent-select" aria-label="Select Active AI Agent Profile"
+          class="bg-transparent text-primary text-xs sm:text-sm font-semibold rounded-lg px-1.5 py-1 focus:outline-none truncate max-w-[150px] sm:max-w-[230px] cursor-pointer">
+        </select>
+        <span id="sdk-badge" class="hidden md:inline-block text-[10px] font-medium px-2 py-0.5 rounded-full pro-pill text-secondary">
+          SDK Ready
+        </span>
+      </div>
+    </div>
+
+    <!-- Center/Right: 1-Tap Ollama <-> Gemini Segmented Switcher + Theme Toggle -->
+    <div class="flex items-center gap-2 shrink-0">
+      <div class="segmented-control" role="group" aria-label="Switch between Ollama and Gemini engine">
+        <button id="btn-toggle-ollama" type="button" class="segmented-option">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          <span>Ollama</span>
+        </button>
+        <button id="btn-toggle-gemini" type="button" class="segmented-option is-active">
+          <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+          <span>Gemini</span>
+        </button>
+      </div>
+
+      <button id="btn-open-new-agent" type="button" title="New Agent Profile"
+        class="pro-pill w-8 h-8 rounded-full flex items-center justify-center text-secondary hover:opacity-80 transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+      </button>
+
+      <!-- Light / Dark Theme Toggle -->
+      <button id="btn-theme-toggle" type="button" title="Toggle White / Dark Mode" aria-label="Toggle Light or Dark color theme"
+        class="pro-pill w-8 h-8 rounded-full flex items-center justify-center text-secondary hover:opacity-80 transition">
+        <svg id="theme-toggle-svg" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- PENDING APPROVAL BANNER -->
+  <div id="approval-banner" class="hidden bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 flex items-center justify-between gap-2">
+    <div class="flex items-center gap-2 min-w-0">
+      <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping shrink-0"></span>
+      <span id="approval-banner-text" class="text-xs font-medium text-primary truncate">Agent waiting for tool approval...</span>
+    </div>
+    <button id="btn-review-approval" type="button"
+      class="shrink-0 btn-primary-pro text-xs px-3 py-1 rounded-full">
+      Review Gate
+    </button>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MAIN WORKSPACE VIEWS                                                  -->
+  <!-- ===================================================================== -->
+  <main class="flex-1 overflow-hidden relative flex flex-col">
+
+    <!-- TAB 1: CONVERSATION CANVAS (ChatGPT / Claude / Gemini Style) -->
+    <section id="view-chat" class="flex-1 flex flex-col h-full overflow-hidden">
+      <!-- Scrollable Conversation Stream -->
+      <div id="chat-messages" class="flex-1 overflow-y-auto px-4 py-6 select-text">
+        <div class="max-w-2xl mx-auto space-y-5" id="chat-thread">
+          <!-- Minimalist Empty-State Greeting -->
+          <div id="chat-empty-state" class="py-10 text-center space-y-5">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full pro-pill text-xs text-secondary">
+              <span id="chat-agent-provider-badge" class="font-semibold text-primary">GEMINI</span>
+              <span>•</span>
+              <span id="chat-agent-role" class="truncate">Multi-Agent Coordinator</span>
+              <span>•</span>
+              <span id="chat-subagent-count" class="text-indigo-600 font-medium">3 Gates</span>
+            </div>
+            <h2 class="text-2xl sm:text-3xl font-semibold tracking-tight text-primary">
+              What would you like to build or fix?
+            </h2>
+            <p id="ollama-status-pill" class="text-xs text-tertiary">Checking agent engines...</p>
+
+            <!-- Clean Action Starter Cards (ChatGPT / Claude Prompt Starters) -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-left pt-2">
+              <button type="button" data-quick-prompt="Run pytest and check git status (Test Mobile Approval Gate)"
+                class="quick-prompt-btn pro-card rounded-2xl p-3.5 hover:border-indigo-500 transition space-y-1">
+                <div class="text-xs font-semibold text-primary">Test Approval Gate</div>
+                <div class="text-[11px] text-secondary leading-snug">Trigger a live mobile tool permission check</div>
+              </button>
+              <button type="button" data-quick-prompt="Edit mobile_notes.md and add a training roadmap for my new Ollama PC"
+                class="quick-prompt-btn pro-card rounded-2xl p-3.5 hover:border-indigo-500 transition space-y-1">
+                <div class="text-xs font-semibold text-primary">Edit File &amp; Diff</div>
+                <div class="text-[11px] text-secondary leading-snug">Propose a workspace file edit and inspect diff</div>
+              </button>
+              <button type="button" data-quick-prompt="Delegate to code_researcher subagent to review the backend architecture"
+                class="quick-prompt-btn pro-card rounded-2xl p-3.5 hover:border-indigo-500 transition space-y-1">
+                <div class="text-xs font-semibold text-primary">Subagent Review</div>
+                <div class="text-[11px] text-secondary leading-snug">Spawn autonomous subagents to audit code</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Floating Pill Composer Bar (ChatGPT / Claude Style) -->
+      <div class="shrink-0 px-3 pb-3 pt-1 bg-canvas">
+        <form id="chat-form" class="max-w-2xl mx-auto floating-composer px-3.5 py-2 flex items-end gap-2">
+          <textarea id="chat-input" rows="1" placeholder="Ask Antigravity to edit files, explain code, or run tests..."
+            class="flex-1 bg-transparent text-primary placeholder-zinc-400 text-sm py-1.5 px-1 focus:outline-none resize-none max-h-32"></textarea>
+          <button type="submit" id="btn-send-chat" aria-label="Send message"
+            class="w-8 h-8 rounded-full btn-primary-pro flex items-center justify-center shrink-0 mb-0.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- TAB 2: FILE TREE EXPLORER & CODE / DIFF VIEWER -->
+    <section id="view-files" class="hidden flex-1 flex flex-col h-full overflow-hidden">
+      <div class="bg-canvas border-b pro-border px-4 py-2.5 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2 min-w-0">
+          <button id="btn-back-to-tree" type="button" class="hidden text-xs pro-pill font-medium px-3 py-1 rounded-full">
+            ← Files
+          </button>
+          <span id="current-file-label" class="text-xs font-mono font-semibold text-primary truncate">Workspace Files</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button id="btn-toggle-file-diff" type="button" class="hidden text-xs pro-pill font-semibold px-3 py-1 rounded-full">
+            View Diff
+          </button>
+          <button id="btn-save-file" type="button" class="hidden text-xs btn-primary-pro px-3.5 py-1 rounded-full">
+            Save
+          </button>
+          <button id="btn-refresh-files" type="button" class="text-xs pro-pill font-medium px-3 py-1 rounded-full">
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <div id="file-tree-pane" class="flex-1 overflow-y-auto max-w-3xl w-full mx-auto p-3 space-y-1.5"></div>
+
+      <div id="file-editor-pane" class="hidden flex-1 flex flex-col overflow-hidden">
+        <textarea id="file-editor-textarea" spellcheck="false"
+          class="flex-1 w-full bg-zinc-950 text-zinc-100 font-mono text-xs p-4 focus:outline-none resize-none leading-relaxed select-text"></textarea>
+        <div id="file-diff-viewer" class="hidden flex-1 overflow-y-auto pro-card m-3 rounded-2xl p-3.5 font-mono text-xs space-y-0.5 select-text"></div>
+      </div>
+    </section>
+
+    <!-- TAB 3: GIT STATUS, DIFF, BRANCH & COMMIT CONTROLS -->
+    <section id="view-git" class="hidden flex-1 overflow-y-auto p-4">
+      <div class="max-w-2xl mx-auto space-y-4">
+        <div class="pro-card rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="text-[11px] font-medium text-tertiary">Current Branch</span>
+              <div class="flex items-center gap-2 mt-0.5">
+                <span id="git-current-branch" class="text-sm font-semibold text-primary font-mono">main</span>
+              </div>
+            </div>
+            <button id="btn-refresh-git" type="button" class="text-xs pro-pill font-medium px-3 py-1.5 rounded-full">
+              Refresh
+            </button>
+          </div>
+
+          <div class="flex gap-2">
+            <input id="git-new-branch-input" type="text" placeholder="Branch name..."
+              class="flex-1 pro-input text-xs rounded-xl px-3 py-2" />
+            <button id="btn-git-checkout" type="button" class="pro-pill text-xs font-medium px-3.5 py-2 rounded-xl">
+              Switch
+            </button>
+            <button id="btn-git-create-branch" type="button" class="btn-primary-pro text-xs px-3.5 py-2 rounded-xl">
+              + Branch
+            </button>
+          </div>
+
+          <div class="flex gap-2 pt-2 border-t pro-border">
+            <input id="git-clone-url-input" type="text" placeholder="Clone Git URL (https://github.com/user/repo.git)..."
+              class="flex-1 pro-input text-xs rounded-xl px-3 py-2" />
+            <button id="btn-git-clone" type="button" class="pro-pill text-xs font-semibold px-3.5 py-2 rounded-xl">
+              Clone Repo
+            </button>
+          </div>
+        </div>
+
+        <div class="pro-card rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-semibold text-primary">Stage &amp; Commit</h2>
+            <button id="btn-git-stage-all" type="button" class="text-[11px] pro-pill font-medium px-2.5 py-1 rounded-full">
+              Stage All (-A)
+            </button>
+          </div>
+          <div class="flex gap-2">
+            <input id="git-commit-msg" type="text" placeholder="Commit message..."
+              class="flex-1 pro-input text-xs rounded-xl px-3 py-2" />
+            <button id="btn-git-commit" type="button" class="btn-primary-pro text-xs px-4 py-2 rounded-xl">
+              Commit
+            </button>
+          </div>
+          <div id="git-changed-files" class="space-y-1.5 pt-1 text-xs"></div>
+        </div>
+
+        <div class="pro-card rounded-2xl p-4 space-y-2">
+          <h3 class="text-xs font-semibold text-primary">Unified Diff</h3>
+          <div id="git-diff-box" class="bg-elevated border pro-border rounded-xl p-3 font-mono text-[11px] overflow-x-auto max-h-72 overflow-y-auto select-text">
+            No uncommitted diff changes.
+          </div>
+        </div>
+
+        <div class="pro-card rounded-2xl p-4 space-y-2">
+          <h3 class="text-xs font-semibold text-primary">Recent Commits</h3>
+          <div id="git-commits-list" class="space-y-2 text-xs"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: MULTI-AGENT ORCHESTRATOR & SETTINGS -->
+    <section id="view-agents" class="hidden flex-1 overflow-y-auto p-4">
+      <div class="max-w-2xl mx-auto space-y-4">
+        <!-- Agent Profile Creation Explanation Card -->
+        <div class="pro-card rounded-2xl p-4 space-y-3">
+          <div class="flex items-start justify-between gap-3">
+            <div class="space-y-1">
+              <h2 class="text-sm font-semibold text-primary">Agent Profiles &amp; SDK Architecture</h2>
+              <p class="text-xs text-secondary leading-relaxed">
+                Each profile compiles directly into a Google Antigravity SDK configuration:
+                <strong>Ollama</strong> profiles use <code class="text-[11px] pro-pill px-1.5 py-0.5 rounded">LocalOpenAIAgentConfig.lightweight()</code>, while
+                <strong>Gemini</strong> profiles use <code class="text-[11px] pro-pill px-1.5 py-0.5 rounded">LocalAgentConfig</code> with autonomous subagents and tool approval hooks.
+              </p>
+            </div>
+          </div>
+          <button id="btn-add-agent-card" type="button"
+            class="w-full btn-primary-pro text-xs py-2.5 rounded-xl">
+            + Create New Agent Profile
+          </button>
+        </div>
+
+        <!-- Engine & Security Settings -->
+        <div class="pro-card rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-sm font-semibold text-primary">Engine Connections</h2>
+              <p class="text-xs text-secondary">Configure Ollama endpoint, Gemini API key, and access PIN</p>
+            </div>
+            <button id="btn-test-ollama" type="button"
+              class="text-xs pro-pill font-medium px-3 py-1.5 rounded-full">
+              Test Ollama
+            </button>
+          </div>
+
+          <div class="space-y-2.5">
+            <div>
+              <label class="block text-[11px] font-medium text-secondary mb-1">Ollama Server URL (Local PC or Tailscale IP)</label>
+              <input id="setting-ollama-url" type="text" value="http://localhost:11434"
+                class="w-full pro-input text-xs font-mono rounded-xl px-3 py-2" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-medium text-secondary mb-1">
+                Gemini API Key (<a href="https://aistudio.google.com/app/api-keys" target="_blank" rel="noopener" class="underline text-primary">Google AI Studio</a>)
+              </label>
+              <input id="setting-gemini-key" type="password" placeholder="AIzaSy... or AQ...."
+                class="w-full pro-input text-xs font-mono rounded-xl px-3 py-2" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-medium text-secondary mb-1">
+                Remote Access PIN (Matches <code>AGY_ACCESS_PIN</code> on Render/Cloud)
+              </label>
+              <input id="setting-access-pin" type="password" placeholder="Optional PIN for cloud security"
+                class="w-full pro-input text-xs font-mono rounded-xl px-3 py-2" />
+            </div>
+            <button id="btn-save-settings" type="button"
+              class="w-full btn-primary-pro text-xs py-2.5 rounded-xl">
+              Save Connection Settings
+            </button>
+          </div>
+        </div>
+
+        <!-- Roster List -->
+        <div class="flex items-center justify-between px-1">
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-tertiary">Agent Profiles</h2>
+          <span class="text-[11px] text-tertiary">Tap to switch active agent</span>
+        </div>
+        <div id="agents-roster-list" class="space-y-2.5"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===================================================================== -->
+  <!-- MINIMALIST SVG BOTTOM NAVIGATION BAR                                  -->
+  <!-- ===================================================================== -->
+  <nav class="shrink-0 bg-canvas border-t pro-border px-3 py-1.5 grid grid-cols-4 gap-1 z-20">
+    <button type="button" data-tab="chat" class="nav-tab-btn flex flex-col items-center py-1.5 rounded-xl text-primary font-semibold">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+      </svg>
+      <span class="text-[11px] mt-1">Chat</span>
+    </button>
+    <button type="button" data-tab="files" class="nav-tab-btn flex flex-col items-center py-1.5 rounded-xl text-tertiary hover:text-primary">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+      </svg>
+      <span class="text-[11px] mt-1">Files</span>
+    </button>
+    <button type="button" data-tab="git" class="nav-tab-btn flex flex-col items-center py-1.5 rounded-xl text-tertiary hover:text-primary">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2" />
+      </svg>
+      <span class="text-[11px] mt-1">Git</span>
+    </button>
+    <button type="button" data-tab="agents" class="nav-tab-btn flex flex-col items-center py-1.5 rounded-xl text-tertiary hover:text-primary">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+      </svg>
+      <span class="text-[11px] mt-1">Agents</span>
+    </button>
+  </nav>
+
+  <!-- NATIVE MODAL <dialog> FOR MOBILE TOOL APPROVAL GATES -->
+  <dialog id="approval-dialog" aria-labelledby="approval-dialog-title">
+    <div class="space-y-3.5">
+      <div class="flex items-center justify-between">
+        <h2 id="approval-dialog-title" class="text-sm font-semibold text-primary">Tool Permission Request</h2>
+        <span class="px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 text-[11px] font-semibold">
+          Approval Gate
+        </span>
+      </div>
+      <p class="text-xs text-secondary">
+        Agent <strong id="approval-agent-name" class="text-primary">ollama-coder</strong> wants to execute:
+      </p>
+      <div class="bg-elevated border pro-border rounded-xl p-3 space-y-1.5">
+        <div class="text-xs font-mono font-semibold text-primary" id="approval-tool-name">run_command</div>
+        <pre id="approval-tool-args" class="text-[11px] font-mono text-zinc-200 bg-zinc-900 rounded-lg p-2.5 whitespace-pre-wrap break-all max-h-40 overflow-y-auto"></pre>
+      </div>
+      <form method="dialog" class="flex items-center justify-end gap-2 pt-1">
+        <button type="submit" value="reject" autofocus
+          class="pro-pill text-xs font-semibold px-4 py-2 rounded-xl">
+          Deny
+        </button>
+        <button type="submit" value="approve"
+          class="btn-primary-pro text-xs px-4 py-2 rounded-xl">
+          Approve &amp; Run
+        </button>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- NATIVE MODAL <dialog> FOR CREATING A NEW AGENT PROFILE -->
+  <dialog id="new-agent-dialog" aria-labelledby="new-agent-dialog-title">
+    <form id="new-agent-form" method="dialog" class="space-y-3.5">
+      <div class="flex items-center justify-between">
+        <h2 id="new-agent-dialog-title" class="text-sm font-semibold text-primary">New Agent Profile</h2>
+        <span class="text-[10px] font-medium px-2 py-0.5 rounded-full pro-pill text-secondary">Antigravity SDK</span>
+      </div>
+      <div class="space-y-2.5">
+        <div>
+          <label class="block text-[11px] font-medium text-secondary mb-1">Display Name</label>
+          <input id="new-agent-name" type="text" required placeholder="e.g., My Custom Trained Ollama Model"
+            class="w-full pro-input text-xs rounded-xl px-3 py-2" />
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] font-medium text-secondary mb-1">Engine</label>
+            <select id="new-agent-provider"
+              class="w-full pro-input text-xs font-medium rounded-xl px-3 py-2">
+              <option value="ollama">Ollama (LocalOpenAI)</option>
+              <option value="gemini">Gemini (+Subagents)</option>
+              <option value="litert">LiteRT On-Device</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-secondary mb-1">Model Identifier</label>
+            <input id="new-agent-model" type="text" value="gemma4:26b" placeholder="gemma4:26b or blank"
+              class="w-full pro-input text-xs font-mono rounded-xl px-3 py-2" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-[11px] font-medium text-secondary mb-1">Role Description</label>
+          <input id="new-agent-role" type="text" value="Custom Coding Specialist"
+            class="w-full pro-input text-xs rounded-xl px-3 py-2" />
+        </div>
+        <div>
+          <label class="block text-[11px] font-medium text-secondary mb-1">System Instructions</label>
+          <textarea id="new-agent-instructions" rows="2"
+            placeholder="You are a senior software engineer specialized in my codebase..."
+            class="w-full pro-input text-xs rounded-xl px-3 py-2"></textarea>
+        </div>
+        <div class="flex items-center gap-4 pt-1">
+          <label class="flex items-center gap-1.5 text-xs text-primary font-medium">
+            <input id="new-agent-gate-cmd" type="checkbox" checked /> Gate <code>run_command</code>
+          </label>
+          <label class="flex items-center gap-1.5 text-xs text-primary font-medium">
+            <input id="new-agent-gate-edit" type="checkbox" checked /> Gate <code>edit_file</code>
+          </label>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-1">
+        <button type="button" id="btn-cancel-new-agent" autofocus
+          class="pro-pill text-xs font-semibold px-4 py-2 rounded-xl">
+          Cancel
+        </button>
+        <button type="submit" value="create"
+          class="btn-primary-pro text-xs px-4 py-2 rounded-xl">
+          Create Profile
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

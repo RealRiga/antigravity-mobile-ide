@@ -1,0 +1,19 @@
+services:
+  antigravity-mobile:
+    build: .
+    container_name: antigravity-mobile-ide
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - AGY_WORKSPACE_DIR=/workspace/me
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - AGY_ACCESS_PIN=${AGY_ACCESS_PIN:-}
+    volumes:
+      # Mount your entire 'me' projects folder so you can edit any repo from your phone!
+      - /home/realriga/development/me:/workspace/me
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+

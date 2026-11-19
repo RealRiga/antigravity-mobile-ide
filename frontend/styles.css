@@ -1,0 +1,289 @@
+/*
+ * Antigravity Mobile IDE — Professional Design System (ChatGPT / Claude / Gemini Inspired)
+ * Compliant with modern-web-guidance: `dark-mode`, `dark-mode-toggle`, `dialog`
+ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  color-scheme: light dark;
+
+  /* Reflect <meta name="color-scheme"> override back onto :root */
+  &:has(> head > meta[name="color-scheme"][content="dark"]) {
+    color-scheme: dark;
+  }
+  &:has(> head > meta[name="color-scheme"][content="light"]) {
+    color-scheme: light;
+  }
+
+  /* Pure White Default (Light) & Deep Obsidian (Dark) Palette */
+  --brand-accent-light: #18181b;
+  --brand-accent-dark: #f4f4f5;
+  --brand-indigo-light: #4f46e5;
+  --brand-indigo-dark: #818cf8;
+
+  --bg-canvas-light: #ffffff;
+  --bg-canvas-dark: #0d0d0f;
+
+  --bg-elevated-light: #f9f9fb;
+  --bg-elevated-dark: #16161a;
+
+  --bg-card-light: #ffffff;
+  --bg-card-dark: #18181c;
+
+  --bg-pill-light: #f4f4f6;
+  --bg-pill-dark: #222228;
+
+  --border-subtle-light: #e4e4e7;
+  --border-subtle-dark: #27272a;
+
+  --text-primary-light: #09090b;
+  --text-primary-dark: #fafafa;
+
+  --text-secondary-light: #52525b;
+  --text-secondary-dark: #a1a1aa;
+
+  --text-tertiary-light: #71717a;
+  --text-tertiary-dark: #71717a;
+
+  --composer-shadow-light: 0 4px 24px -2px rgba(9, 9, 11, 0.07), 0 0 0 1px rgba(9, 9, 11, 0.06);
+  --composer-shadow-dark: 0 8px 30px -4px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.08);
+
+  --card-shadow-light: 0 1px 3px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --card-shadow-dark: 0 2px 8px rgba(0, 0, 0, 0.35);
+
+  --scrollbar-track-light: transparent;
+  --scrollbar-track-dark: transparent;
+  --scrollbar-thumb-light: #d4d4d8;
+  --scrollbar-thumb-dark: #3f3f46;
+
+  /* Fallbacks for browsers without light-dark() */
+  --accent-color: var(--brand-indigo-light);
+  --bg-canvas: var(--bg-canvas-light);
+  --bg-elevated: var(--bg-elevated-light);
+  --bg-card: var(--bg-card-light);
+  --bg-pill: var(--bg-pill-light);
+  --border-subtle: var(--border-subtle-light);
+  --text-primary: var(--text-primary-light);
+  --text-secondary: var(--text-secondary-light);
+  --text-tertiary: var(--text-tertiary-light);
+  --composer-shadow: var(--composer-shadow-light);
+  --card-shadow: var(--card-shadow-light);
+  --scrollbar-track: var(--scrollbar-track-light);
+  --scrollbar-thumb: var(--scrollbar-thumb-light);
+
+  @media (prefers-color-scheme: dark) {
+    --accent-color: var(--brand-indigo-dark);
+    --bg-canvas: var(--bg-canvas-dark);
+    --bg-elevated: var(--bg-elevated-dark);
+    --bg-card: var(--bg-card-dark);
+    --bg-pill: var(--bg-pill-dark);
+    --border-subtle: var(--border-subtle-dark);
+    --text-primary: var(--text-primary-dark);
+    --text-secondary: var(--text-secondary-dark);
+    --text-tertiary: var(--text-tertiary-dark);
+    --composer-shadow: var(--composer-shadow-dark);
+    --card-shadow: var(--card-shadow-dark);
+    --scrollbar-track: var(--scrollbar-track-dark);
+    --scrollbar-thumb: var(--scrollbar-thumb-dark);
+  }
+
+  @supports (color: light-dark(white, black)) {
+    --accent-color: light-dark(var(--brand-indigo-light), var(--brand-indigo-dark));
+    --bg-canvas: light-dark(var(--bg-canvas-light), var(--bg-canvas-dark));
+    --bg-elevated: light-dark(var(--bg-elevated-light), var(--bg-elevated-dark));
+    --bg-card: light-dark(var(--bg-card-light), var(--bg-card-dark));
+    --bg-pill: light-dark(var(--bg-pill-light), var(--bg-pill-dark));
+    --border-subtle: light-dark(var(--border-subtle-light), var(--border-subtle-dark));
+    --text-primary: light-dark(var(--text-primary-light), var(--text-primary-dark));
+    --text-secondary: light-dark(var(--text-secondary-light), var(--text-secondary-dark));
+    --text-tertiary: light-dark(var(--text-tertiary-light), var(--text-tertiary-dark));
+    --scrollbar-track: light-dark(var(--scrollbar-track-light), var(--scrollbar-track-dark));
+    --scrollbar-thumb: light-dark(var(--scrollbar-thumb-light), var(--scrollbar-thumb-dark));
+  }
+
+  accent-color: var(--accent-color);
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+:root:has(> head > meta[name="color-scheme"][content="dark"]) {
+  --composer-shadow: var(--composer-shadow-dark);
+  --card-shadow: var(--card-shadow-dark);
+}
+:root:has(> head > meta[name="color-scheme"][content="light"]) {
+  --composer-shadow: var(--composer-shadow-light);
+  --card-shadow: var(--card-shadow-light);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+  padding: 0;
+  overscroll-behavior-y: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Core Surface Classes */
+.bg-canvas {
+  background-color: var(--bg-canvas);
+}
+
+.bg-elevated {
+  background-color: var(--bg-elevated);
+}
+
+.pro-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--card-shadow);
+}
+
+.pro-pill {
+  background-color: var(--bg-pill);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.pro-input {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pro-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.pro-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+.pro-border {
+  border-color: var(--border-subtle);
+}
+
+.text-primary {
+  color: var(--text-primary);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-tertiary {
+  color: var(--text-tertiary);
+}
+
+/* Floating Composer (ChatGPT / Claude Style) */
+.floating-composer {
+  background-color: var(--bg-card);
+  box-shadow: var(--composer-shadow);
+  border-radius: 1.5rem;
+  transition: box-shadow 0.2s ease;
+}
+
+/* Engine Switcher (Minimalist Segmented Control) */
+.segmented-control {
+  background-color: var(--bg-pill);
+  border: 1px solid var(--border-subtle);
+  border-radius: 9999px;
+  padding: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.segmented-option {
+  border-radius: 9999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.segmented-option.is-active {
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Primary CTA Button */
+.btn-primary-pro {
+  background-color: var(--text-primary);
+  color: var(--bg-canvas);
+  font-weight: 600;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+.btn-primary-pro:hover {
+  opacity: 0.9;
+}
+
+.btn-primary-pro:active {
+  transform: scale(0.98);
+}
+
+/* Code Blocks */
+pre, code {
+  color-scheme: dark;
+  accent-color: var(--accent-color);
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Native Modal <dialog> per modern-web-guidance `dialog` rule */
+dialog:modal {
+  overscroll-behavior: contain;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+  max-width: 92vw;
+  width: 27rem;
+  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.28);
+}
+
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+  background: rgba(9, 9, 11, 0.45);
+  backdrop-filter: blur(6px);
+}
+
+/* Diff Highlighting */
+.diff-add {
+  background-color: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+:root:has(> head > meta[name="color-scheme"][content="dark"]) .diff-add {
+  color: #34d399;
+}
+.diff-del {
+  background-color: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+}
+:root:has(> head > meta[name="color-scheme"][content="dark"]) .diff-del {
+  color: #f87171;
+}
+.diff-hunk {
+  background-color: rgba(79, 70, 229, 0.12);
+  color: #4f46e5;
+}
+:root:has(> head > meta[name="color-scheme"][content="dark"]) .diff-hunk {
+  color: #818cf8;
+}

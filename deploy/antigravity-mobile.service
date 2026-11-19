@@ -1,0 +1,16 @@
+[Unit]
+Description=Antigravity Mobile IDE (FastAPI + Multi-Agent + Ollama)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/realriga/development/me/antigravity-mobile-ide
+Environment="AGY_WORKSPACE_DIR=/home/realriga/development/me/antigravity-mobile-ide"
+Environment="OLLAMA_BASE_URL=http://localhost:11434"
+ExecStart=/home/realriga/development/me/antigravity-mobile-ide/.venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
+
