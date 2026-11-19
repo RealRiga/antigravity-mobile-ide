@@ -316,6 +316,41 @@ dialog::backdrop {
   & .tok-fn { color: #2563eb; }
 }
 
+/* Privacy Obscure Mode for Repo Names (when working in public spaces) */
+.repo-obscurable {
+  transition: filter 0.18s ease, opacity 0.18s ease;
+}
+
+body.obscure-repos .repo-obscurable {
+  filter: blur(5px);
+  user-select: none;
+}
+
+body.obscure-repos .repo-obscurable:hover,
+body.obscure-repos .repo-obscurable:active {
+  filter: blur(0);
+}
+
+/* Pull-to-Refresh Indicator Banner */
+.ptr-indicator {
+  height: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background-color: var(--bg-elevated);
+  border-bottom: 0 solid var(--border-subtle);
+  transition: height 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ptr-indicator.is-visible {
+  border-bottom-width: 1px;
+}
+
 /* Diff Highlighting */
 .diff-add {
   background-color: rgba(16, 185, 129, 0.12);

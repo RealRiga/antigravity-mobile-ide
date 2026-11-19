@@ -21,6 +21,8 @@ const state = {
   showingDiff: false,
   activeTurnCard: null,
   isGenerating: false,
+  activeTab: "chat",
+  obscureRepos: localStorage.getItem("agy_obscure_repos") === "true",
   accessPin: localStorage.getItem("agy_access_pin") || "",
   githubToken: localStorage.getItem("agy_github_token") || "",
   pinRequiredByServer: false,
@@ -278,6 +280,7 @@ if (newAgentProviderSelect && newAgentModelInput) {
 
 // 5. Left Sidebar Tab Navigation
 function activateTab(targetTab) {
+  state.activeTab = targetTab;
   document.querySelectorAll(".nav-tab-btn").forEach((b) => {
     b.classList.remove("text-primary", "bg-zinc-500/10", "font-semibold");
     b.classList.add("text-secondary");
@@ -753,8 +756,8 @@ async function loadLocalWorkspaces() {
     card.className = "pro-card rounded-2xl p-3.5 flex items-center justify-between gap-2";
     card.innerHTML = `
       <div class="min-w-0">
-        <div class="text-xs font-semibold text-primary truncate font-mono">${escapeHtml(ws.name)}</div>
-        <div class="text-[10px] text-tertiary truncate">${escapeHtml(ws.path)}</div>
+        <div class="repo-obscurable text-xs font-semibold text-primary truncate font-mono">${escapeHtml(ws.name)}</div>
+        <div class="repo-obscurable text-[10px] text-tertiary truncate">${escapeHtml(ws.path)}</div>
       </div>
       <button type="button" class="text-xs px-3 py-1.5 rounded-full font-semibold shrink-0 ${
         ws.active ? "btn-primary-pro" : "pro-pill hover:opacity-80"
@@ -826,12 +829,12 @@ async function loadGitHubRepos() {
       <div class="space-y-1">
         <div class="flex items-center justify-between gap-2">
           <div class="flex items-center gap-1.5 min-w-0">
-            <span class="text-xs font-semibold text-primary font-mono truncate">${escapeHtml(repo.name)}</span>
+            <span class="repo-obscurable text-xs font-semibold text-primary font-mono truncate">${escapeHtml(repo.name)}</span>
             ${visBadge}
           </div>
           <span class="text-[10px] px-2 py-0.5 rounded-full pro-pill text-secondary shrink-0">${escapeHtml(repo.language)}</span>
         </div>
-        <p class="text-[11px] text-secondary line-clamp-2">${escapeHtml(repo.description)}</p>
+        <p class="repo-obscurable text-[11px] text-secondary line-clamp-2">${escapeHtml(repo.description)}</p>
       </div>
       <div class="flex items-center justify-between pt-2 border-t pro-border">
         <span class="text-[10px] text-tertiary">Updated ${escapeHtml(repo.updated_at)}</span>
@@ -913,7 +916,7 @@ function renderExplorerDirectory(dirPath = "") {
   crumbBar.className = "flex items-center flex-wrap gap-1 px-2 py-1.5 mb-1.5 text-xs font-mono border-b pro-border";
   const rootBtn = document.createElement("button");
   rootBtn.type = "button";
-  rootBtn.className = "font-semibold text-indigo-600 hover:underline";
+  rootBtn.className = "repo-obscurable font-semibold text-indigo-600 hover:underline";
   rootBtn.textContent = headerWorkspaceName ? headerWorkspaceName.textContent : "root";
   rootBtn.addEventListener("click", () => renderExplorerDirectory(""));
   crumbBar.appendChild(rootBtn);
@@ -1534,5 +1537,157 @@ const btnDocGuide = document.getElementById("btn-doc-tab-guide");
 const btnDocReadme = document.getElementById("btn-doc-tab-readme");
 if (btnDocGuide) btnDocGuide.addEventListener("click", () => loadInAppDocs("docs"));
 if (btnDocReadme) btnDocReadme.addEventListener("click", () => loadInAppDocs("readme"));
+
+// 14. Privacy Obscure Toggle for Repository Names (When Working in Public)
+const EYE_OPEN_PATH =
+  "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z";
+const EYE_SLASH_PATH =
+  "M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21";
+
+function applyRepoObscureState(obscured) {
+  state.obscureRepos = Boolean(obscured);
+  document.body.classList.toggle("obscure-repos", state.obscureRepos);
+  const eyePath = document.querySelector("#obscure-eye-svg path");
+  if (eyePath) {
+    eyePath.setAttribute("d", state.obscureRepos ? EYE_SLASH_PATH : EYE_OPEN_PATH);
+  }
+  const ghLabel = document.getElementById("github-obscure-label");
+  if (ghLabel) {
+    ghLabel.textContent = state.obscureRepos ? "🙈 Show Names" : "👁️ Hide Names";
+  }
+  try {
+    localStorage.setItem("agy_obscure_repos", String(state.obscureRepos));
+  } catch (e) {}
+}
+
+applyRepoObscureState(state.obscureRepos);
+
+const btnToggleObscure = document.getElementById("btn-toggle-obscure");
+const btnGithubObscure = document.getElementById("btn-github-obscure");
+if (btnToggleObscure) {
+  btnToggleObscure.addEventListener("click", () => applyRepoObscureState(!state.obscureRepos));
+}
+if (btnGithubObscure) {
+  btnGithubObscure.addEventListener("click", () => applyRepoObscureState(!state.obscureRepos));
+}
+
+// 15. Mobile Drag-Down Pull-to-Refresh Gesture
+(function initPullToRefresh() {
+  const ptrIndicator = document.getElementById("ptr-indicator");
+  const ptrText = document.getElementById("ptr-text");
+  const ptrSpinner = document.getElementById("ptr-spinner");
+  const mainEl = document.querySelector("main");
+  if (!ptrIndicator || !mainEl) return;
+
+  let startY = 0;
+  let pulling = false;
+  let refreshing = false;
+  let currentPull = 0;
+  const THRESHOLD = 62;
+
+  function getActiveScrollContainer() {
+    const map = {
+      chat: document.getElementById("chat-messages"),
+      files: document.getElementById("file-tree-pane"),
+      github: document.getElementById("view-github"),
+      git: document.getElementById("view-git"),
+      agents: document.getElementById("view-agents"),
+      docs: document.getElementById("view-docs"),
+    };
+    return map[state.activeTab] || null;
+  }
+
+  async function refreshCurrentTabView() {
+    await refreshHealth();
+    if (state.activeTab === "chat") {
+      await loadAgents();
+    } else if (state.activeTab === "files") {
+      await loadFileTree();
+    } else if (state.activeTab === "github") {
+      await Promise.all([loadLocalWorkspaces(), loadGitHubRepos()]);
+    } else if (state.activeTab === "git") {
+      await loadGitStatus();
+    } else if (state.activeTab === "agents") {
+      await loadAgents();
+    } else if (state.activeTab === "docs") {
+      cachedDocsPayload = null;
+      await loadInAppDocs("docs");
+    }
+  }
+
+  mainEl.addEventListener(
+    "touchstart",
+    (e) => {
+      if (refreshing || e.touches.length !== 1) return;
+      const scroller = getActiveScrollContainer();
+      if (scroller && scroller.scrollTop > 2) return;
+      startY = e.touches[0].clientY;
+      pulling = true;
+      currentPull = 0;
+    },
+    { passive: true }
+  );
+
+  mainEl.addEventListener(
+    "touchmove",
+    (e) => {
+      if (!pulling || refreshing) return;
+      const scroller = getActiveScrollContainer();
+      if (scroller && scroller.scrollTop > 2) {
+        pulling = false;
+        ptrIndicator.style.height = "0px";
+        return;
+      }
+      const deltaY = e.touches[0].clientY - startY;
+      if (deltaY <= 0) {
+        currentPull = 0;
+        ptrIndicator.style.height = "0px";
+        ptrIndicator.classList.remove("is-visible");
+        return;
+      }
+      currentPull = Math.min(82, deltaY * 0.55);
+      ptrIndicator.style.height = `${currentPull}px`;
+      ptrIndicator.classList.add("is-visible");
+      if (currentPull >= THRESHOLD) {
+        ptrText.textContent = "Release to refresh...";
+        ptrSpinner.style.transform = "rotate(180deg)";
+      } else {
+        ptrText.textContent = "Pull down to refresh...";
+        ptrSpinner.style.transform = "rotate(0deg)";
+      }
+    },
+    { passive: true }
+  );
+
+  mainEl.addEventListener("touchend", async () => {
+    if (!pulling || refreshing) return;
+    pulling = false;
+    if (currentPull >= THRESHOLD) {
+      refreshing = true;
+      ptrIndicator.style.height = "44px";
+      ptrText.textContent = "Refreshing workspace...";
+      ptrSpinner.classList.add("animate-spin");
+      try {
+        await Promise.all([
+          refreshCurrentTabView(),
+          new Promise((r) => setTimeout(r, 450)),
+        ]);
+        ptrText.textContent = "✓ Up to date";
+        ptrSpinner.classList.remove("animate-spin");
+        await new Promise((r) => setTimeout(r, 450));
+      } finally {
+        ptrIndicator.style.height = "0px";
+        ptrIndicator.classList.remove("is-visible");
+        ptrSpinner.style.transform = "rotate(0deg)";
+        refreshing = false;
+        currentPull = 0;
+      }
+    } else {
+      ptrIndicator.style.height = "0px";
+      ptrIndicator.classList.remove("is-visible");
+      currentPull = 0;
+    }
+  });
+})();
 
 initApp();

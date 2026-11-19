@@ -142,7 +142,15 @@
         <svg class="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
-        <span id="header-workspace-name" class="truncate">antigravity-mobile-ide</span>
+        <span id="header-workspace-name" class="repo-obscurable truncate">antigravity-mobile-ide</span>
+      </button>
+
+      <!-- Privacy Eye Button: Obscure / Reveal Repo Names in Public -->
+      <button id="btn-toggle-obscure" type="button" title="Obscure / Hide Repo Names in Public" aria-label="Toggle repository name privacy blur"
+        class="pro-pill w-7 h-7 rounded-lg flex items-center justify-center text-secondary hover:opacity-80 transition shrink-0">
+        <svg id="obscure-eye-svg" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+        </svg>
       </button>
     </div>
 
@@ -267,6 +275,14 @@
     <!-- MAIN CONTENT WORKSPACE (min-w-0 prevents flex items from overflowing right on mobile!) -->
     <main class="flex-1 min-w-0 overflow-hidden relative flex flex-col bg-canvas">
 
+      <!-- DRAG-DOWN PULL-TO-REFRESH INDICATOR BAR -->
+      <div id="ptr-indicator" class="ptr-indicator shrink-0">
+        <svg id="ptr-spinner" class="w-3.5 h-3.5 text-emerald-500 transition-transform" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+        </svg>
+        <span id="ptr-text">Pull down to refresh...</span>
+      </div>
+
       <!-- VIEW 1: CONVERSATION CANVAS (ChatGPT / Claude / Gemini Style) -->
       <section id="view-chat" class="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
         <div id="chat-messages" class="flex-1 overflow-y-auto px-3.5 sm:px-8 py-5 select-text">
@@ -385,7 +401,10 @@
               </div>
               <div class="flex items-center gap-2">
                 <input id="github-username-input" type="text" value="RealRiga" placeholder="GitHub username..."
-                  class="pro-input text-xs font-mono rounded-xl px-3 py-1.5 w-36" />
+                  class="pro-input text-xs font-mono rounded-xl px-3 py-1.5 w-32 sm:w-36" />
+                <button id="btn-github-obscure" type="button" class="pro-pill text-xs font-semibold px-3 py-1.5 rounded-xl flex items-center gap-1">
+                  <span id="github-obscure-label">👁️ Hide Names</span>
+                </button>
                 <button id="btn-fetch-github-repos" type="button" class="btn-primary-pro text-xs px-3.5 py-1.5 rounded-xl">
                   Load Repos
                 </button>
