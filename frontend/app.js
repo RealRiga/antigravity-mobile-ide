@@ -71,6 +71,48 @@ const approvalToolArgs = document.getElementById("approval-tool-args");
 
 const newAgentDialog = document.getElementById("new-agent-dialog");
 
+// Universal Native <dialog> Confirmation Helper (Safe Cancel button has autofocus, returnValue reset on close)
+const confirmDialog = document.getElementById("confirm-dialog");
+const confirmDialogTitle = document.getElementById("confirm-dialog-title");
+const confirmDialogBadge = document.getElementById("confirm-dialog-badge");
+const confirmDialogMessage = document.getElementById("confirm-dialog-message");
+const confirmDialogOkBtn = document.getElementById("confirm-dialog-ok-btn");
+
+function askConfirmation({
+  title = "Confirm Action",
+  message = "Are you sure you want to proceed?",
+  confirmLabel = "Confirm",
+  badge = "Confirmation",
+  destructive = false,
+}) {
+  return new Promise((resolve) => {
+    if (!confirmDialog) {
+      resolve(window.confirm(message));
+      return;
+    }
+    if (confirmDialogTitle) confirmDialogTitle.textContent = title;
+    if (confirmDialogMessage) confirmDialogMessage.textContent = message;
+    if (confirmDialogBadge) confirmDialogBadge.textContent = badge;
+    if (confirmDialogOkBtn) {
+      confirmDialogOkBtn.textContent = confirmLabel;
+      confirmDialogOkBtn.className = destructive
+        ? "bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs px-4 py-2 rounded-xl transition"
+        : "btn-primary-pro text-xs px-4 py-2 rounded-xl";
+    }
+
+    const onClose = () => {
+      const choice = confirmDialog.returnValue;
+      confirmDialog.returnValue = "";
+      confirmDialog.removeEventListener("close", onClose);
+      resolve(choice === "confirm");
+    };
+    confirmDialog.addEventListener("close", onClose);
+    if (!confirmDialog.open) {
+      confirmDialog.showModal();
+    }
+  });
+}
+
 // 1. Intercept fetch to attach X-AGY-PIN and automatically open PIN dialog on 401 Unauthorized
 const origFetch = window.fetch.bind(window);
 window.fetch = async (url, options = {}) => {
@@ -781,13 +823,24 @@ function buildUserMessageRow(text, msgIndex, checkpointSha) {
   const actions = document.createElement("div");
   actions.className = "flex items-center gap-2 text-[10px] text-tertiary px-1";
 
-  // Edit Previous Prompt Button
+  // Edit Previous Prompt Button (With Confirmation Card!)
   const editBtn = document.createElement("button");
   editBtn.type = "button";
   editBtn.className = "hover:text-primary font-medium transition";
   editBtn.textContent = "✏️ Edit";
   editBtn.addEventListener("click", async () => {
     if (state.isGenerating) return;
+    const confirmed = await askConfirmation({
+      title: "Edit Previous Prompt?",
+      message: checkpointSha
+        ? `This will rewind the chat and restore your workspace files back to checkpoint ${checkpointSha.slice(0, 7)} so you can edit and resend this prompt.`
+        : "This will rewind the conversation back to this prompt so you can edit and resend it.",
+      confirmLabel: "Rewind & Edit",
+      badge: "Edit Prompt",
+      destructive: true,
+    });
+    if (!confirmed) return;
+
     if (checkpointSha) {
       await restoreCodeToCheckpoint(checkpointSha, msgIndex);
     } else {
@@ -806,7 +859,7 @@ function buildUserMessageRow(text, msgIndex, checkpointSha) {
   });
   actions.appendChild(editBtn);
 
-  // Restore Code Checkpoint Button (if a Git tree snapshot was captured before this prompt)
+  // Restore Code Checkpoint Button (With Confirmation Card!)
   if (checkpointSha) {
     const restoreBtn = document.createElement("button");
     restoreBtn.type = "button";
@@ -815,6 +868,14 @@ function buildUserMessageRow(text, msgIndex, checkpointSha) {
     restoreBtn.textContent = `↺ Restore Code (${checkpointSha.slice(0, 6)})`;
     restoreBtn.addEventListener("click", async () => {
       if (state.isGenerating) return;
+      const confirmed = await askConfirmation({
+        title: "Restore Code Checkpoint?",
+        message: `All workspace files will be reverted back to snapshot ${checkpointSha.slice(0, 7)} (captured right before "${text.slice(0, 40)}"). Any edits made after this point will be undone.`,
+        confirmLabel: "Restore Code",
+        badge: "Checkpoint",
+        destructive: true,
+      });
+      if (!confirmed) return;
       restoreBtn.textContent = "Restoring...";
       const ok = await restoreCodeToCheckpoint(checkpointSha, msgIndex);
       if (ok) {
@@ -1366,6 +1427,14 @@ document.getElementById("btn-back-to-tree").addEventListener("click", () => {
 
 document.getElementById("btn-save-file").addEventListener("click", async () => {
   if (!state.currentFilePath) return;
+  const confirmed = await askConfirmation({
+    title: "Save File Changes?",
+    message: `Write your edits to ${state.currentFilePath}?`,
+    confirmLabel: "Save File",
+    badge: "File Edit",
+  });
+  if (!confirmed) return;
+
   const content = document.getElementById("file-editor-textarea").value;
   const res = await fetch("/api/files/write", {
     method: "POST",
@@ -1377,7 +1446,7 @@ document.getElementById("btn-save-file").addEventListener("click", async () => {
   renderSyntaxHighlightedFile(content);
   const btn = document.getElementById("btn-save-file");
   btn.textContent = "Saved ✓";
-  setTimeout(() => (btn.textContent = "Save File"), 1400);
+  setTimeout(() => (btn.textContent = "Save"), 1400);
 });
 
 document.getElementById("btn-toggle-file-diff").addEventListener("click", () => {
@@ -1482,11 +1551,19 @@ btnStageAll.addEventListener("click", () =>
 
 document.getElementById("btn-git-commit").addEventListener("click", async () => {
   const input = document.getElementById("git-commit-msg");
-  if (!input.value.trim()) return;
+  const msg = input.value.trim();
+  if (!msg) return;
+  const confirmed = await askConfirmation({
+    title: "Commit All Changes?",
+    message: `Stage all modified files and create a Git commit with message: "${msg}"?`,
+    confirmLabel: "Commit Now",
+    badge: "Git Commit",
+  });
+  if (!confirmed) return;
   await fetch("/api/git/commit", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: input.value.trim() }),
+    body: JSON.stringify({ message: msg }),
   });
   input.value = "";
   await loadGitStatus();
@@ -1495,6 +1572,13 @@ document.getElementById("btn-git-commit").addEventListener("click", async () => 
 document.getElementById("btn-git-checkout").addEventListener("click", async () => {
   const branch = document.getElementById("git-new-branch-input").value.trim();
   if (!branch) return;
+  const confirmed = await askConfirmation({
+    title: "Switch Git Branch?",
+    message: `Checkout existing branch "${branch}"?`,
+    confirmLabel: "Switch Branch",
+    badge: "Git Branch",
+  });
+  if (!confirmed) return;
   await fetch("/api/git/checkout", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1506,6 +1590,13 @@ document.getElementById("btn-git-checkout").addEventListener("click", async () =
 document.getElementById("btn-git-create-branch").addEventListener("click", async () => {
   const branch = document.getElementById("git-new-branch-input").value.trim();
   if (!branch) return;
+  const confirmed = await askConfirmation({
+    title: "Create & Switch Branch?",
+    message: `Create a new Git branch named "${branch}" and switch into it?`,
+    confirmLabel: "Create Branch",
+    badge: "Git Branch",
+  });
+  if (!confirmed) return;
   await fetch("/api/git/checkout", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -2133,9 +2224,20 @@ if (btnPinChat) {
 }
 
 if (btnDeleteChat) {
-  btnDeleteChat.addEventListener("click", () => {
+  btnDeleteChat.addEventListener("click", async () => {
     const ws = state.currentWorkspaceName;
     const store = getAllProjectChatsStore();
+    const activeChat = (store[ws] || []).find((c) => c.id === state.activeChatId);
+    const title = activeChat ? activeChat.title : "this chat";
+    const confirmed = await askConfirmation({
+      title: "Delete Chat Thread?",
+      message: `Are you sure you want to permanently delete "${title}" from project ${ws}? This cannot be undone.`,
+      confirmLabel: "Delete Chat",
+      badge: "Delete",
+      destructive: true,
+    });
+    if (!confirmed) return;
+
     store[ws] = (store[ws] || []).filter((c) => c.id !== state.activeChatId);
     saveAllProjectChatsStore(store);
     state.activeChatId = null;

@@ -651,6 +651,30 @@
     </main>
   </div>
 
+  <!-- NATIVE MODAL <dialog> FOR UNIVERSAL ACTION CONFIRMATION (Follows modern-web-guidance `dialog` Rule 1) -->
+  <dialog id="confirm-dialog" aria-labelledby="confirm-dialog-title">
+    <div class="space-y-3.5">
+      <div class="flex items-center justify-between gap-2">
+        <h2 id="confirm-dialog-title" class="text-sm font-semibold text-primary">Confirm Action</h2>
+        <span id="confirm-dialog-badge" class="px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 text-[11px] font-semibold">
+          Confirmation
+        </span>
+      </div>
+      <p id="confirm-dialog-message" class="text-xs text-secondary leading-relaxed">
+        Are you sure you want to proceed with this action?
+      </p>
+      <form method="dialog" class="flex items-center justify-end gap-2 pt-1">
+        <!-- Safe Cancel action receives autofocus per modern-web-guidance `dialog` rule -->
+        <button type="submit" value="cancel" autofocus class="pro-pill text-xs font-semibold px-4 py-2 rounded-xl">
+          Cancel
+        </button>
+        <button type="submit" value="confirm" id="confirm-dialog-ok-btn" class="btn-primary-pro text-xs px-4 py-2 rounded-xl">
+          Confirm
+        </button>
+      </form>
+    </div>
+  </dialog>
+
   <!-- NATIVE MODAL <dialog> FOR ACCESS PIN UNLOCK -->
   <dialog id="pin-dialog" aria-labelledby="pin-dialog-title">
     <form id="pin-dialog-form" method="dialog" class="space-y-3.5">
