@@ -83,10 +83,19 @@ async def public_cron_health() -> Dict[str, Any]:
 
 
 @app.get("/api/github/repos")
-async def list_github_repos(username: str = "RealRiga", token: Optional[str] = None) -> Dict[str, Any]:
-    """Fetches ALL GitHub repositories (with automatic multi-page pagination) for 1-click workspace switching."""
+async def list_github_repos(
+    request: Request,
+    username: str = "RealRiga",
+    token: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Fetches ALL GitHub repositories (with automatic multi-page pagination) using secure X-GitHub-Token header."""
     clean_user = username.strip() or "RealRiga"
-    gh_token = (token or os.environ.get("GITHUB_TOKEN", "")).strip()
+    # Prefer secure HTTP header (never logged in URLs) over query param or server env var
+    gh_token = (
+        request.headers.get("X-GitHub-Token")
+        or token
+        or os.environ.get("GITHUB_TOKEN", "")
+    ).strip()
     if not gh_token:
         try:
             import subprocess

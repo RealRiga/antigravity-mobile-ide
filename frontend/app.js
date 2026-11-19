@@ -927,10 +927,13 @@ async function loadGitHubRepos() {
   }
 
   grid.innerHTML = `<div class="text-xs text-tertiary col-span-2">Loading all GitHub repositories for @${escapeHtml(username)}...</div>`;
-  const url = `/api/github/repos?username=${encodeURIComponent(username)}${
-    token ? `&token=${encodeURIComponent(token)}` : ""
-  }`;
-  const res = await fetch(url);
+  // Pass GitHub token strictly via X-GitHub-Token header (never in URL query string!)
+  const url = `/api/github/repos?username=${encodeURIComponent(username)}`;
+  const reqHeaders = {};
+  if (token) {
+    reqHeaders["X-GitHub-Token"] = token;
+  }
+  const res = await fetch(url, { headers: reqHeaders });
   if (!res.ok) return;
   const data = await res.json();
 

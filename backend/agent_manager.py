@@ -517,16 +517,27 @@ class MultiAgentOrchestrator:
             )
             return
 
-        # Full Google Antigravity SDK Execution with Automatic High-Demand Failover
+        # Full Google Antigravity SDK Execution with Multi-Model 503 High-Demand Failover
         try:
             full_text: List[str] = []
-            # If user didn't lock a specific model on Gemini, try default first with fast 8s timeout,
-            # then fail over to gemini-3.1-flash-lite if default hits 503 High Demand
-            candidate_models = (
-                [profile.model.strip(), "gemini-3.1-flash-lite"]
-                if profile.provider in ("cloud", "gemini")
-                else [profile.model.strip()]
-            )
+            # Build a deduplicated failover cascade across fast free-tier models so a 503 spike on one model never fails the turn!
+            if profile.provider in ("cloud", "gemini"):
+                raw_candidates = [
+                    profile.model.strip(),
+                    "gemini-3.1-flash-lite",
+                    "gemini-3.5-flash-lite",
+                    "gemini-2.5-flash-lite",
+                    "gemini-3.8-flash",
+                ]
+                seen = set()
+                candidate_models = []
+                for m in raw_candidates:
+                    if m and m not in seen:
+                        seen.add(m)
+                        candidate_models.append(m)
+            else:
+                candidate_models = [profile.model.strip()]
+
             last_exc: Optional[Exception] = None
 
             for idx, cand_model in enumerate(candidate_models):
@@ -542,8 +553,7 @@ class MultiAgentOrchestrator:
                         stream_iter = response.__aiter__()
                         while True:
                             try:
-                                # Allow up to 45s per chunk (Render free tier cold CPU + tool execution needs >12s)
-                                token = await asyncio.wait_for(stream_iter.__anext__(), timeout=45.0)
+                                token = await asyncio.wait_for(stream_iter.__anext__(), timeout=35.0)
                                 chunk = str(token)
                                 full_text.append(chunk)
                                 await emit(
@@ -561,19 +571,17 @@ class MultiAgentOrchestrator:
                 except Exception as attempt_exc:
                     last_exc = attempt_exc
                     err_s = str(attempt_exc) or attempt_exc.__class__.__name__
-                    # If first model had 503 High Demand or Timeout, automatically switch to fast lite model
-                    if (
-                        idx == 0
-                        and len(candidate_models) > 1
-                        and ("503" in err_s or "UNAVAILABLE" in err_s or isinstance(attempt_exc, asyncio.TimeoutError))
-                    ):
-                        await emit(
-                            {
-                                "type": "thought_delta",
-                                "agent_id": profile.id,
-                                "delta": "Primary model experiencing temporary delay; retrying with fast cloud model...\n",
-                            }
-                        )
+                    has_next = idx < len(candidate_models) - 1
+                    is_transient = (
+                        "503" in err_s
+                        or "UNAVAILABLE" in err_s
+                        or "429" in err_s
+                        or "404" in err_s
+                        or "NOT_FOUND" in err_s
+                        or isinstance(attempt_exc, asyncio.TimeoutError)
+                    )
+                    if has_next and is_transient:
+                        await asyncio.sleep(0.4)
                         continue
                     raise attempt_exc
 
