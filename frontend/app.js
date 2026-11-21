@@ -2534,11 +2534,14 @@ if (btnPickerChat) {
     openCustomPicker({
       title: `Chats in ${ws}`,
       selectedValue: state.activeChatId,
-      options: list.map((c) => ({
-        value: c.id,
-        label: `${c.pinned ? "📌 " : ""}${c.title}`,
-        subtitle: `${(c.messages || []).length} messages • ${new Date(c.updatedAt || c.createdAt).toLocaleDateString()}`,
-      })),
+      options: list.map((c) => {
+        const srcPrefix = c.ideLabel ? `${c.ideLabel} • ` : "";
+        return {
+          value: c.id,
+          label: `${c.pinned ? "📌 " : ""}${c.title}`,
+          subtitle: `${srcPrefix}${(c.messages || []).length} messages • ${new Date(c.updatedAt || c.createdAt).toLocaleDateString()}`,
+        };
+      }),
       onSelect: (chosenId) => {
         state.activeChatId = chosenId;
         renderProjectChatControls(ws);
@@ -2584,6 +2587,315 @@ if (btnDeleteChat) {
     saveAllProjectChatsStore(store);
     state.activeChatId = null;
     loadProjectChats(ws);
+  });
+}
+
+// 17. Private Local IDE Chat Bridge & Direct Browser Import (100% Client-Side — Zero Server Storage)
+const ideSyncDialog = document.getElementById("ide-sync-dialog");
+const btnOpenIdeSync = document.getElementById("btn-open-ide-sync");
+const btnSettingsOpenIdeSync = document.getElementById("btn-settings-open-ide-sync");
+const btnCloseIdeSync = document.getElementById("btn-close-ide-sync");
+const ideBridgeUrlInput = document.getElementById("ide-bridge-url-input");
+const ideBridgeTokenInput = document.getElementById("ide-bridge-token-input");
+const ideBridgeIdeSelect = document.getElementById("ide-bridge-ide-select");
+const ideBridgeScopeSelect = document.getElementById("ide-bridge-scope-select");
+const ideBridgeStatusPill = document.getElementById("ide-bridge-status-pill");
+const ideBridgeDetectedRow = document.getElementById("ide-bridge-detected-row");
+const btnIdeBridgeSync = document.getElementById("btn-ide-bridge-sync");
+const btnIdeBridgeDisconnect = document.getElementById("btn-ide-bridge-disconnect");
+const ideImportFileInput = document.getElementById("ide-import-file-input");
+const btnIdeImportFiles = document.getElementById("btn-ide-import-files");
+const ideSyncFeedback = document.getElementById("ide-sync-feedback");
+
+function showIdeSyncFeedback(message, isError = false) {
+  if (!ideSyncFeedback) return;
+  ideSyncFeedback.textContent = message;
+  ideSyncFeedback.className = isError
+    ? "text-xs rounded-xl px-3 py-2 bg-rose-500/10 border border-rose-500/30 text-rose-600"
+    : "text-xs rounded-xl px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-600";
+  ideSyncFeedback.classList.remove("hidden");
+}
+
+function openIdeSyncModal() {
+  if (!ideSyncDialog) return;
+  try {
+    if (ideBridgeUrlInput) ideBridgeUrlInput.value = localStorage.getItem("ownstack_ide_bridge_url") || "";
+    if (ideBridgeTokenInput) ideBridgeTokenInput.value = localStorage.getItem("ownstack_ide_bridge_token") || "";
+  } catch (e) {}
+  if (ideSyncFeedback) ideSyncFeedback.classList.add("hidden");
+  if (!ideSyncDialog.open) ideSyncDialog.showModal();
+}
+
+if (btnOpenIdeSync) btnOpenIdeSync.addEventListener("click", openIdeSyncModal);
+if (btnSettingsOpenIdeSync) btnSettingsOpenIdeSync.addEventListener("click", openIdeSyncModal);
+if (btnCloseIdeSync && ideSyncDialog) {
+  btnCloseIdeSync.addEventListener("click", () => ideSyncDialog.close());
+}
+
+function mergeIdeChatsIntoLocalStore(incomingChats, forceCurrentWorkspace = false) {
+  const store = getAllProjectChatsStore();
+  const activeWs = state.currentWorkspaceName || "workspace";
+  let importedCount = 0;
+  let lastChatIdInActive = null;
+
+  incomingChats.forEach((chat) => {
+    if (!chat || !Array.isArray(chat.messages) || chat.messages.length === 0) return;
+    const targetProject =
+      forceCurrentWorkspace || !chat.project || chat.project === "unassigned"
+        ? activeWs
+        : chat.project;
+
+    store[targetProject] = store[targetProject] || [];
+    const existingIdx = store[targetProject].findIndex((c) => c.id === chat.id);
+    const normalized = {
+      id: chat.id || `ide-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      title: chat.title || "Imported IDE Chat",
+      ide: chat.ide || "imported",
+      ideLabel: chat.ide_label || chat.ideLabel || "Imported IDE",
+      createdAt: chat.createdAt || Date.now(),
+      updatedAt: chat.updatedAt || Date.now(),
+      pinned: existingIdx >= 0 ? store[targetProject][existingIdx].pinned : true,
+      messages: chat.messages.map((m) => ({
+        role: m.role === "user" ? "user" : "assistant",
+        content: String(m.content || ""),
+      })),
+    };
+
+    if (existingIdx >= 0) {
+      store[targetProject][existingIdx] = normalized;
+    } else {
+      store[targetProject].unshift(normalized);
+    }
+    importedCount += 1;
+    if (targetProject === activeWs) {
+      lastChatIdInActive = normalized.id;
+    }
+  });
+
+  // Sort each project's threads by updatedAt descending
+  Object.keys(store).forEach((proj) => {
+    store[proj].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  });
+  saveAllProjectChatsStore(store);
+
+  if (lastChatIdInActive) {
+    state.activeChatId = lastChatIdInActive;
+  }
+  loadProjectChats(activeWs);
+  return importedCount;
+}
+
+if (btnIdeBridgeSync) {
+  btnIdeBridgeSync.addEventListener("click", async () => {
+    const rawUrl = (ideBridgeUrlInput ? ideBridgeUrlInput.value : "").trim().replace(/\/+$/, "");
+    const token = (ideBridgeTokenInput ? ideBridgeTokenInput.value : "").trim();
+    const ideFilter = ideBridgeIdeSelect ? ideBridgeIdeSelect.value : "all";
+    const scope = ideBridgeScopeSelect ? ideBridgeScopeSelect.value : "current";
+
+    if (!rawUrl || !token) {
+      showIdeSyncFeedback("Enter both your Local Bridge URL and personal Bridge Token.", true);
+      return;
+    }
+
+    try {
+      localStorage.setItem("ownstack_ide_bridge_url", rawUrl);
+      localStorage.setItem("ownstack_ide_bridge_token", token);
+    } catch (e) {}
+
+    await withButtonLoader(btnIdeBridgeSync, "Syncing...", async () => {
+      try {
+        // Connect DIRECTLY from the user's browser to their own PC bridge (never routed through Render!)
+        const bridgeHeaders = { Authorization: `Bearer ${token}` };
+        const healthRes = await origFetch(`${rawUrl}/bridge/health`, { headers: bridgeHeaders });
+        if (healthRes.status === 401) {
+          if (ideBridgeStatusPill) ideBridgeStatusPill.textContent = "Invalid Token";
+          showIdeSyncFeedback("Bridge rejected your token (401). Copy the exact token printed by ownstack_bridge.py.", true);
+          return;
+        }
+        if (!healthRes.ok) {
+          throw new Error(`Bridge health check returned ${healthRes.status}`);
+        }
+        const healthData = await healthRes.json();
+        if (ideBridgeStatusPill) {
+          ideBridgeStatusPill.textContent = `Connected (${healthData.hostname || "PC"})`;
+          ideBridgeStatusPill.className = "text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600";
+        }
+        if (ideBridgeDetectedRow && Array.isArray(healthData.ides)) {
+          ideBridgeDetectedRow.innerHTML = healthData.ides
+            .map((i) =>
+              `<span class="px-2 py-0.5 rounded-full ${
+                i.detected ? "bg-emerald-500/15 text-emerald-600 font-semibold" : "pro-pill text-tertiary opacity-60"
+              }">${i.detected ? "✓ " : ""}${escapeHtml(i.label)}</span>`
+            )
+            .join("");
+          ideBridgeDetectedRow.classList.remove("hidden");
+        }
+
+        const projectQuery =
+          scope === "current" && state.hasRepo && state.currentWorkspaceName
+            ? state.currentWorkspaceName
+            : "all";
+        const chatsUrl = `${rawUrl}/bridge/chats?ide=${encodeURIComponent(ideFilter)}&project=${encodeURIComponent(projectQuery)}&include_messages=true&limit=50`;
+        const chatsRes = await origFetch(chatsUrl, { headers: bridgeHeaders });
+        if (!chatsRes.ok) {
+          throw new Error(`Bridge chats fetch returned ${chatsRes.status}`);
+        }
+        const chatsData = await chatsRes.json();
+        const synced = mergeIdeChatsIntoLocalStore(chatsData.chats || [], scope === "current");
+        if (synced === 0) {
+          showIdeSyncFeedback(
+            scope === "current"
+              ? `Connected to ${healthData.hostname || "your PC"}, but no IDE chats matched "${projectQuery}". Try switching scope to "Sync All Projects".`
+              : `Connected to ${healthData.hostname || "your PC"}, no IDE chats found yet.`
+          );
+        } else {
+          showIdeSyncFeedback(`✓ Synced ${synced} private IDE chat${synced === 1 ? "" : "s"} into your browser!`);
+        }
+      } catch (err) {
+        if (ideBridgeStatusPill) {
+          ideBridgeStatusPill.textContent = "Offline / Blocked";
+          ideBridgeStatusPill.className = "text-[10px] font-medium px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-600";
+        }
+        showIdeSyncFeedback(
+          `Could not reach bridge (${err.message}). If OwnStack is on HTTPS, expose your local bridge with Cloudflare Tunnel (https://...) or run OwnStack locally.`,
+          true
+        );
+      }
+    });
+  });
+}
+
+if (btnIdeBridgeDisconnect) {
+  btnIdeBridgeDisconnect.addEventListener("click", () => {
+    try {
+      localStorage.removeItem("ownstack_ide_bridge_url");
+      localStorage.removeItem("ownstack_ide_bridge_token");
+    } catch (e) {}
+    if (ideBridgeUrlInput) ideBridgeUrlInput.value = "";
+    if (ideBridgeTokenInput) ideBridgeTokenInput.value = "";
+    if (ideBridgeStatusPill) {
+      ideBridgeStatusPill.textContent = "Not Connected";
+      ideBridgeStatusPill.className = "text-[10px] font-medium px-2 py-0.5 rounded-full pro-pill text-secondary";
+    }
+    if (ideBridgeDetectedRow) ideBridgeDetectedRow.classList.add("hidden");
+    showIdeSyncFeedback("Cleared saved Bridge URL and Token from this browser.");
+  });
+}
+
+function parseClientSideTranscriptText(fileName, rawText) {
+  const messages = [];
+  let ide = "imported";
+  let ideLabel = "Imported IDE";
+  let createdAt = Date.now();
+  let updatedAt = Date.now();
+
+  const trimmed = rawText.trim();
+  if (!trimmed) return null;
+
+  // Try JSONL (Antigravity transcript.jsonl or Claude Code .jsonl)
+  if (fileName.endsWith(".jsonl") || (!trimmed.startsWith("[") && trimmed.includes("\n"))) {
+    const lines = trimmed.split(/\r?\n/);
+    lines.forEach((ln) => {
+      const s = ln.trim();
+      if (!s) return;
+      try {
+        const obj = JSON.parse(s);
+        // Antigravity transcript.jsonl format
+        if (obj.type === "USER_INPUT" && obj.source === "USER_EXPLICIT" && obj.content) {
+          ide = "antigravity";
+          ideLabel = "Antigravity IDE";
+          const m = String(obj.content).match(/<USER_REQUEST>\s*([\s\S]*?)\s*<\/USER_REQUEST>/);
+          const clean = (m ? m[1] : String(obj.content)).trim();
+          if (clean) messages.push({ role: "user", content: clean });
+          if (obj.created_at) updatedAt = Date.parse(obj.created_at) || updatedAt;
+        } else if (obj.type === "PLANNER_RESPONSE" && obj.content && String(obj.content).trim()) {
+          ide = "antigravity";
+          ideLabel = "Antigravity IDE";
+          messages.push({ role: "assistant", content: String(obj.content).trim() });
+          if (obj.created_at) updatedAt = Date.parse(obj.created_at) || updatedAt;
+        } else {
+          // Claude Code .jsonl format
+          const msgObj = obj.message && typeof obj.message === "object" ? obj.message : obj;
+          const role = msgObj.role || obj.type;
+          if (role === "user" || role === "assistant") {
+            ide = "claude-code";
+            ideLabel = "Claude Code";
+            let content = msgObj.content ?? obj.content ?? "";
+            if (Array.isArray(content)) {
+              content = content
+                .filter((p) => p && p.type === "text" && p.text)
+                .map((p) => p.text)
+                .join("\n");
+            }
+            const clean = String(content || "").trim();
+            if (clean) messages.push({ role, content: clean });
+          }
+        }
+      } catch (e) {}
+    });
+  }
+
+  // Fallback: single JSON array or object ({messages: [...]})
+  if (messages.length === 0) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      const arr = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed.messages)
+        ? parsed.messages
+        : [];
+      arr.forEach((item) => {
+        if (!item) return;
+        const role = item.role === "user" || item.type === "user" ? "user" : "assistant";
+        let content = item.content ?? item.text ?? "";
+        if (Array.isArray(content)) {
+          content = content
+            .filter((p) => p && p.type === "text" && p.text)
+            .map((p) => p.text)
+            .join("\n");
+        }
+        const clean = String(content || "").trim();
+        if (clean) messages.push({ role, content: clean });
+      });
+    } catch (e) {}
+  }
+
+  if (messages.length === 0) return null;
+  const firstUser = messages.find((m) => m.role === "user")?.content || fileName;
+  const firstLine = firstUser.split(/\r?\n/)[0];
+  return {
+    id: `import:${fileName}:${messages.length}`,
+    title: firstLine.slice(0, 55) + (firstLine.length > 55 ? "..." : ""),
+    ide,
+    ideLabel,
+    createdAt,
+    updatedAt,
+    messages,
+  };
+}
+
+if (btnIdeImportFiles && ideImportFileInput) {
+  btnIdeImportFiles.addEventListener("click", async () => {
+    const files = Array.from(ideImportFileInput.files || []);
+    if (files.length === 0) {
+      showIdeSyncFeedback("Choose at least one .jsonl or .json transcript file to import.", true);
+      return;
+    }
+    const parsedChats = [];
+    for (const f of files) {
+      try {
+        const text = await f.text();
+        const chat = parseClientSideTranscriptText(f.name, text);
+        if (chat) parsedChats.push(chat);
+      } catch (e) {}
+    }
+    if (parsedChats.length === 0) {
+      showIdeSyncFeedback("No valid user/assistant messages found in the selected file(s).", true);
+      return;
+    }
+    const count = mergeIdeChatsIntoLocalStore(parsedChats, true);
+    ideImportFileInput.value = "";
+    showIdeSyncFeedback(`✓ Imported ${count} chat thread${count === 1 ? "" : "s"} directly into this browser for "${state.currentWorkspaceName}".`);
   });
 }
 

@@ -18,7 +18,7 @@
   <link rel="manifest" href="/manifest.json" />
   <title>OwnStack IDE — Multi-Agent Coding Workspace</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="/static/styles.css?v=2" />
+  <link rel="stylesheet" href="/static/styles.css?v=3" />
 </head>
 <body class="h-[100dvh] flex flex-col overflow-hidden select-none">
 
@@ -286,6 +286,10 @@
             <button id="btn-new-chat" type="button" title="Start New Chat in This Project"
               class="pro-pill text-[11px] font-semibold px-2.5 py-1 rounded-lg hover:opacity-80 transition shrink-0 whitespace-nowrap">
               + New
+            </button>
+            <button id="btn-open-ide-sync" type="button" title="Sync or Import Chats from Antigravity, Claude Code, Cursor, or VS Code (Private to your browser)"
+              class="pro-pill text-[11px] font-semibold px-2.5 py-1 rounded-lg hover:border-emerald-500 transition shrink-0 whitespace-nowrap flex items-center gap-1">
+              <span>⚡ IDE Sync</span>
             </button>
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
@@ -589,6 +593,24 @@
             </button>
           </div>
 
+          <!-- PRIVATE IDE CHAT BRIDGE & IMPORT CARD (100% Browser-Only — Never Shared With Other Visitors!) -->
+          <div class="pro-card rounded-2xl p-4 space-y-2.5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="space-y-0.5">
+                <div class="flex items-center gap-2">
+                  <h2 class="text-sm font-semibold text-primary">Private IDE Chat Sync &amp; Import</h2>
+                  <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600">Browser-Only</span>
+                </div>
+                <p class="text-xs text-secondary leading-relaxed">
+                  Connect your own <strong>Antigravity IDE</strong>, <strong>Claude Code</strong>, <strong>Cursor</strong>, or <strong>VS Code</strong> chats per project. Credentials &amp; chats stay strictly in your browser — other visitors cannot see them.
+                </p>
+              </div>
+              <button id="btn-settings-open-ide-sync" type="button" class="btn-primary-pro text-xs px-3.5 py-2 rounded-xl shrink-0">
+                ⚡ Connect My IDE
+              </button>
+            </div>
+          </div>
+
           <div class="pro-card rounded-2xl p-4 space-y-3">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <div>
@@ -839,6 +861,80 @@
     </form>
   </dialog>
 
-  <script src="/static/app.js?v=2"></script>
+  <!-- NATIVE MODAL <dialog> FOR PRIVATE IDE CHAT BRIDGE & DIRECT BROWSER IMPORT -->
+  <dialog id="ide-sync-dialog" aria-labelledby="ide-sync-dialog-title">
+    <div class="space-y-4">
+      <div class="flex items-center justify-between gap-2">
+        <div>
+          <h2 id="ide-sync-dialog-title" class="text-sm font-semibold text-primary">Connect Your IDE Chats</h2>
+          <p class="text-[11px] text-secondary">Private to your browser — never sent to or stored on the server</p>
+        </div>
+        <button type="button" id="btn-close-ide-sync" autofocus class="pro-pill text-xs font-semibold px-3 py-1.5 rounded-xl shrink-0">
+          Close
+        </button>
+      </div>
+
+      <!-- Section 1: Live Local IDE Bridge -->
+      <div class="bg-elevated border pro-border rounded-2xl p-3.5 space-y-2.5">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-xs font-semibold text-primary">1. Live Local IDE Bridge (Antigravity, Claude Code, Cursor, VS Code)</span>
+          <span id="ide-bridge-status-pill" class="text-[10px] font-medium px-2 py-0.5 rounded-full pro-pill text-secondary">Not Connected</span>
+        </div>
+        <div class="space-y-2">
+          <input id="ide-bridge-url-input" type="url" placeholder="Bridge URL (e.g. http://127.0.0.1:8787 or https://xxxx.trycloudflare.com)"
+            class="w-full pro-input text-xs font-mono rounded-xl px-3 py-2" />
+          <input id="ide-bridge-token-input" type="password" placeholder="Your personal Bridge Token (osb_...)"
+            class="w-full pro-input text-xs font-mono rounded-xl px-3 py-2" />
+          <div class="grid grid-cols-2 gap-2">
+            <select id="ide-bridge-ide-select" class="pro-input text-xs font-medium rounded-xl px-2.5 py-2">
+              <option value="all">All Detected IDEs</option>
+              <option value="antigravity">Antigravity IDE</option>
+              <option value="claude-code">Claude Code</option>
+              <option value="cursor">Cursor</option>
+              <option value="vscode-cline">VS Code (Cline/Roo)</option>
+            </select>
+            <select id="ide-bridge-scope-select" class="pro-input text-xs font-medium rounded-xl px-2.5 py-2">
+              <option value="current">Match Current Repo</option>
+              <option value="all">Sync All Projects</option>
+            </select>
+          </div>
+          <div class="flex flex-wrap gap-2 pt-0.5">
+            <button id="btn-ide-bridge-sync" type="button" class="flex-1 btn-primary-pro text-xs py-2 rounded-xl">
+              Sync Chats From My IDE
+            </button>
+            <button id="btn-ide-bridge-disconnect" type="button" class="pro-pill text-xs font-semibold px-3 py-2 rounded-xl text-rose-500">
+              Clear
+            </button>
+          </div>
+        </div>
+        <div id="ide-bridge-detected-row" class="hidden flex flex-wrap items-center gap-1.5 pt-1 text-[10px]"></div>
+        <div class="text-[11px] text-tertiary leading-relaxed pt-1 border-t pro-border">
+          Run on your own PC: <code class="pro-pill px-1.5 py-0.5 rounded font-mono text-[10px]">python3 bridge/ownstack_bridge.py</code>
+          <br />For phone/HTTPS access: <code class="pro-pill px-1.5 py-0.5 rounded font-mono text-[10px]">cloudflared tunnel --url http://127.0.0.1:8787</code>
+        </div>
+      </div>
+
+      <!-- Section 2: Direct Browser File Import (Zero Setup / Offline) -->
+      <div class="bg-elevated border pro-border rounded-2xl p-3.5 space-y-2.5">
+        <div class="space-y-0.5">
+          <span class="text-xs font-semibold text-primary">2. Direct Browser Import (Zero Setup)</span>
+          <p class="text-[11px] text-secondary">
+            Pick one or more local chat files (Antigravity <code>transcript.jsonl</code>, Claude Code <code>.jsonl</code>, or JSON chat exports). Parsed 100% in your browser into the active project.
+          </p>
+        </div>
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <input id="ide-import-file-input" type="file" accept=".jsonl,.json,application/json,text/plain" multiple
+            class="flex-1 text-xs text-secondary file:mr-2.5 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-500/15 file:text-emerald-600 hover:file:opacity-85" />
+          <button id="btn-ide-import-files" type="button" class="pro-pill text-xs font-semibold px-3.5 py-2 rounded-xl shrink-0">
+            Import to Project
+          </button>
+        </div>
+      </div>
+
+      <div id="ide-sync-feedback" class="hidden text-xs rounded-xl px-3 py-2"></div>
+    </div>
+  </dialog>
+
+  <script src="/static/app.js?v=3"></script>
 </body>
 </html>
